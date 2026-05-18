@@ -6,7 +6,7 @@ const API_BASE = "https://apis.roblox.com";
 const root = process.cwd();
 const apiKey = process.env.ROBLOX_API_KEY;
 const assetId = process.env.ROBLOX_PLUGIN_ASSET_ID;
-const assetType = process.env.ROBLOX_ASSET_TYPE || "Model";
+const assetType = process.env.ROBLOX_ASSET_TYPE || "Plugin";
 const displayName = process.env.ROBLOX_PLUGIN_DISPLAY_NAME || "StudioLink";
 const description = process.env.ROBLOX_PLUGIN_DESCRIPTION || "StudioLink Roblox Studio plugin.";
 const dryRun = process.argv.includes("--dry-run") || process.env.DRY_RUN === "true";

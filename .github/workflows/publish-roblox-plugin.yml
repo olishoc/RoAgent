@@ -42,5 +42,6 @@ jobs:
         env:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           ROBLOX_PLUGIN_ASSET_ID: ${{ secrets.ROBLOX_PLUGIN_ASSET_ID }}
+          ROBLOX_ASSET_TYPE: Plugin
           DRY_RUN: ${{ inputs.dry_run }}
         run: node tools/publish-roblox-plugin.mjs
