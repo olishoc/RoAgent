@@ -1,8 +1,9 @@
 import { mkdirSync, copyFileSync, existsSync, chmodSync, rmSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const serverRoot = new URL(".", import.meta.url).pathname;
+const serverRoot = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = path.resolve(serverRoot, "..");
 const distDir = path.join(serverRoot, "dist");
 const nccOut = path.join(distDir, "ncc");
