@@ -271,7 +271,7 @@ function writeCredentials(repoPath: string, token: string): void {
   const user = process.env.USERNAME || process.env.USER || "";
   if (user) {
     try {
-      execFileSync("icacls", [file, "/inheritance:r", "/grant:r", `${user}:R`], { stdio: "ignore" });
+      execFileSync("icacls", [file, "/inheritance:r", "/grant:r", `${user}:R`], { stdio: "ignore", windowsHide: true });
     } catch {
       chmodSync(file, 0o600);
     }

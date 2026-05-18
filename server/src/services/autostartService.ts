@@ -39,7 +39,7 @@ export function autostartStatus(): AutostartStatus {
   if (process.platform === "win32") {
     const target = windowsTarget();
     try {
-      const output = execFileSync("reg", ["query", RUN_KEY, "/v", RUN_VALUE], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const output = execFileSync("reg", ["query", RUN_KEY, "/v", RUN_VALUE], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
       return { supported: true, platform: process.platform, enabled: output.includes(target) || output.includes("studiolink-daemon"), method: "windows-hkcu-run", target };
     } catch {
       return { supported: true, platform: process.platform, enabled: false, method: "windows-hkcu-run", target };

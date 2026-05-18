@@ -87,7 +87,7 @@ function resolveRoAgentPath(repoRoot: string): string | null {
 
 function isCommandInstalled(command: string): boolean {
   try {
-    execFileSync(command, ["--version"], { stdio: "ignore" });
+    execFileSync(command, ["--version"], { stdio: "ignore", windowsHide: true });
     return true;
   } catch {
     return false;
