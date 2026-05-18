@@ -32,7 +32,7 @@ describe("self-install helpers", () => {
 
   it("runs explicit self-install commands", () => {
     const dir = "C:\\Users\\Ada\\AppData\\Local\\Programs\\StudioLink";
-    for (const command of ["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "autostart", "logs", "help", "--help", "-h"]) {
+    for (const command of ["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "version", "doctor", "autostart", "logs", "help", "--help", "-h"]) {
       expect(shouldRunSelfInstall(["C:\\Downloads\\studiolink-daemon.exe", command], "win32", "C:\\Downloads\\studiolink-daemon.exe", dir)).toBe(true);
     }
   });

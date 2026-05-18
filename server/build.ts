@@ -37,6 +37,8 @@ rmSync(distDir, { recursive: true, force: true });
 mkdirSync(nccOut, { recursive: true });
 copyTransformed(path.join(serverRoot, "src"), path.join(buildSrc, "server", "src"));
 copyTransformed(path.join(repoRoot, "shared"), path.join(buildSrc, "shared"));
+const buildInfoPath = path.join(buildSrc, "server", "src", "buildInfo.ts");
+writeFileSync(buildInfoPath, `export interface BuildInfo {\n  releaseTag: string;\n  commitSha: string;\n  buildTime: string;\n}\n\nexport const BUILD_INFO: BuildInfo = {\n  releaseTag: ${JSON.stringify(process.env.STUDIOLINK_RELEASE_TAG || "dev")},\n  commitSha: ${JSON.stringify(process.env.STUDIOLINK_COMMIT_SHA || "unknown")},\n  buildTime: ${JSON.stringify(process.env.STUDIOLINK_BUILD_TIME || new Date().toISOString())},\n};\n`, "utf8");
 writeFileSync(path.join(buildSrc, "server", "tsconfig.json"), JSON.stringify({
   compilerOptions: {
     target: "ES2022",

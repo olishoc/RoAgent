@@ -267,10 +267,14 @@ end
 
 function Home:refreshPage(all)
 	self.manager:send("daemon:health", {}, function(payload) self.health = payload; self:renderForBackgroundStatus() end)
-	self.manager:send("git:status", {}, function(payload) self.gitStatus = payload; self:renderForBackgroundStatus() end)
-	self.manager:send("git:githubStatus", {}, function(payload) self.githubStatus = payload; self:renderForBackgroundStatus() end)
 	self.manager:send("agent:status", {}, function(payload) self.agentStatus = payload; self:renderForBackgroundStatus() end)
-	if all or self.page == "history" then self:refreshHistory() end
+	if all or self.page == "history" then
+		self.manager:send("git:status", {}, function(payload) self.gitStatus = payload; self:renderForBackgroundStatus() end)
+		self:refreshHistory()
+	end
+	if all or self.page == "github" then
+		self.manager:send("git:githubStatus", {}, function(payload) self.githubStatus = payload; self:renderForBackgroundStatus() end)
+	end
 	if all or self.page == "logs" then self.manager:send("agent:recentActions", {}, function(payload) self.actions = payload.actions or {}; self:renderForBackgroundStatus() end) end
 	if all or self.page == "settings" then
 		self.manager:send("license:status", {}, function(payload) self.licenseStatus = payload; self:renderForBackgroundStatus() end)

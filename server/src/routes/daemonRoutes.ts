@@ -2,7 +2,7 @@ import type http from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import type { Config } from "../config.ts";
 import { autostartStatus, setAutostart } from "../services/autostartService.ts";
-import { applyUpdate, checkForUpdate, repairReport } from "../services/updateService.ts";
+import { applyUpdate, checkForUpdate, refreshUpdateStatus, repairReport, updateStatusSnapshot } from "../services/updateService.ts";
 import { createSupportBundle } from "../services/supportBundleService.ts";
 
 export async function handleDaemonRoute(req: http.IncomingMessage, res: http.ServerResponse, config: Config): Promise<boolean> {
@@ -32,8 +32,12 @@ export async function handleDaemonRoute(req: http.IncomingMessage, res: http.Ser
       sendJson(res, 200, { success: true, result: setAutostart(body.enabled === true) });
       return true;
     }
+    if (route === "/daemon/update/status") {
+      sendJson(res, 200, { success: true, result: updateStatusSnapshot() });
+      return true;
+    }
     if (route === "/daemon/update/check") {
-      sendJson(res, 200, { success: true, result: await checkForUpdate(config) });
+      sendJson(res, 200, { success: true, result: await refreshUpdateStatus(config) });
       return true;
     }
     if (route === "/daemon/update/apply") {

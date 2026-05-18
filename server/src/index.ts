@@ -24,6 +24,8 @@ import { dispatchMessage, routeMessage } from "./protocol/router.ts";
 import { AppError, toAppError } from "./errors.ts";
 import { ErrorCode, GLOBAL_PLACE_ID } from "../../shared/protocol.ts";
 import type { HandlerContext } from "./types.ts";
+import { BUILD_INFO } from "./buildInfo.ts";
+import { scheduleAutomaticUpdateCheck, updateStatusSnapshot } from "./services/updateService.ts";
 
 const PACKAGE_VERSION = "3.0.0";
 const VERSION = readPackageVersion();
@@ -66,6 +68,10 @@ function buildHealth(config: ReturnType<typeof loadConfig>, licenseService: Lice
   const roAgentPath = resolveRoAgentPath(config.repoRoot);
   return {
     version: VERSION,
+    releaseTag: BUILD_INFO.releaseTag,
+    commitSha: BUILD_INFO.commitSha,
+    buildTime: BUILD_INFO.buildTime,
+    update: updateStatusSnapshot(),
     roAgentInstalled: Boolean(roAgentPath),
     roAgentPath,
     gitInstalled: isCommandInstalled("git"),
@@ -386,6 +392,7 @@ function main(): void {
     if (!health.gitInstalled) logger.warn({ event: "health-warning" }, "git executable is not available on PATH");
     logger.info({ event: "daemon-start", port: config.port }, "RoAgent daemon started");
     console.log(`RoAgent daemon listening on ws://${config.host}:${config.port}`);
+    scheduleAutomaticUpdateCheck(config, logger);
   });
 
   server.on("error", (error) => {

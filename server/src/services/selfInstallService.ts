@@ -3,6 +3,7 @@ import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { BUILD_INFO } from "../buildInfo.ts";
 
 export interface SelfInstallEnv {
   LOCALAPPDATA?: string;
@@ -19,7 +20,7 @@ const APP_NAME = "StudioLink";
 const RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const RUN_VALUE = "StudioLink";
 const UNINSTALL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\StudioLink";
-const CLI_COMMANDS = new Set(["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "autostart", "logs", "help", "--help", "-h"]);
+const CLI_COMMANDS = new Set(["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "version", "doctor", "autostart", "logs", "help", "--help", "-h"]);
 
 export function defaultInstallDir(env: SelfInstallEnv = process.env, home = homedir()): string {
   const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
@@ -110,6 +111,8 @@ export function handleSelfInstallCommand(version: string): boolean {
     else if (command === "restart") restartDaemon();
     else if (command === "status") printStatus(version);
     else if (command === "settings") printSettings(version);
+    else if (command === "version") printVersion(version);
+    else if (command === "doctor") printDoctor(version);
     else if (command === "autostart") handleAutostart(process.argv[3]);
     else if (command === "logs") printLogs();
     else if (command === "help" || command === "--help" || command === "-h") printHelp();
@@ -211,12 +214,17 @@ function printStatus(version: string): void {
   const commandShim = join(installDir, "StudioLink.cmd");
   console.log(JSON.stringify({
     version,
+    releaseTag: BUILD_INFO.releaseTag,
+    commitSha: BUILD_INFO.commitSha,
+    buildTime: BUILD_INFO.buildTime,
     installDir,
     installed: existsSync(daemon),
     roAgentInstalled: existsSync(roagent),
     commandShim,
     commandInstalled: existsSync(commandShim),
     userPathConfigured: pathListContains(readUserPath(), installDir),
+    currentShellPathConfigured: pathListContains(process.env.Path || process.env.PATH, installDir),
+    pathRefreshHint: pathListContains(readUserPath(), installDir) && !pathListContains(process.env.Path || process.env.PATH, installDir) ? `Current terminal PATH is stale. Run: $env:Path += \";${installDir}\"` : undefined,
     autostartEnabled: isAutostartEnabled(daemon),
     logs: daemonLogPaths(),
   }, null, 2));
@@ -226,7 +234,9 @@ function printSettings(version: string): void {
   const installDir = defaultInstallDir();
   const daemon = join(installDir, "studiolink-daemon.exe");
   const logs = daemonLogPaths();
-  console.log(`StudioLink ${version}`);
+  console.log(`StudioLink ${version} (${BUILD_INFO.releaseTag})`);
+  console.log(`Commit: ${BUILD_INFO.commitSha}`);
+  console.log(`Built: ${BUILD_INFO.buildTime}`);
   console.log(`Install dir: ${installDir}`);
   console.log(`Data dir: ${defaultDataDir()}`);
   console.log(`Daemon installed: ${existsSync(daemon)}`);
@@ -235,7 +245,33 @@ function printSettings(version: string): void {
   console.log(`Autostart enabled: ${isAutostartEnabled(daemon)}`);
   console.log(`Stdout log: ${logs.stdout}`);
   console.log(`Stderr log: ${logs.stderr}`);
-  console.log("Commands: StudioLink, StudioLink status, StudioLink start, StudioLink stop, StudioLink restart, StudioLink autostart on|off|status, StudioLink logs, StudioLink uninstall");
+  console.log("Commands: StudioLink, StudioLink version, StudioLink doctor, StudioLink status, StudioLink start, StudioLink stop, StudioLink restart, StudioLink autostart on|off|status, StudioLink logs, StudioLink uninstall");
+}
+
+function printVersion(version: string): void {
+  console.log(`StudioLink ${version}`);
+  console.log(`Release: ${BUILD_INFO.releaseTag}`);
+  console.log(`Commit: ${BUILD_INFO.commitSha}`);
+  console.log(`Built: ${BUILD_INFO.buildTime}`);
+}
+
+function printDoctor(version: string): void {
+  const installDir = defaultInstallDir();
+  const daemon = join(installDir, "studiolink-daemon.exe");
+  const commandShim = join(installDir, "StudioLink.cmd");
+  const userPathConfigured = pathListContains(readUserPath(), installDir);
+  const currentShellPathConfigured = pathListContains(process.env.Path || process.env.PATH, installDir);
+  printVersion(version);
+  console.log(`Install dir exists: ${existsSync(installDir)}`);
+  console.log(`Daemon installed: ${existsSync(daemon)}`);
+  console.log(`Command shim installed: ${existsSync(commandShim)}`);
+  console.log(`HKCU user PATH configured: ${userPathConfigured}`);
+  console.log(`Current terminal PATH configured: ${currentShellPathConfigured}`);
+  if (userPathConfigured && !currentShellPathConfigured) console.log(`PATH fix for this terminal: $env:Path += \";${installDir}\"`);
+  console.log(`Autostart enabled: ${isAutostartEnabled(daemon)}`);
+  console.log(`Health check: http://127.0.0.1:45678/health`);
+  console.log(`Direct command: & ${JSON.stringify(commandShim)} status`);
+  console.log(`Logs: ${daemonLogPaths().stdout} and ${daemonLogPaths().stderr}`);
 }
 
 function printLogs(): void {
@@ -252,6 +288,8 @@ Usage:
   StudioLink                         Start the daemon in the background
   StudioLink run                     Run the daemon in the foreground for debugging
   StudioLink status                  Show install/daemon status as JSON
+  StudioLink version                 Show exact release/build identity
+  StudioLink doctor                  Diagnose install, PATH, autostart, and logs
   StudioLink settings                Show install paths, logs, PATH, and autostart
   StudioLink start                   Start the daemon in the background
   StudioLink stop                    Stop the daemon

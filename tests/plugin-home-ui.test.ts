@@ -54,6 +54,6 @@ describe("plugin Home UI reliability", () => {
     expect(utils).not.toContain("Rotation = 0.15");
     expect(utils).not.toContain("Scale = 1.025");
     expect(utils).toContain("function Utils.animateIn");
-    expect(main).toContain('PLUGIN_VERSION = "1.0.9"');
+    expect(main).toContain('PLUGIN_VERSION = "1.0.10"');
   });
 });
