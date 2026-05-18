@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
@@ -19,6 +19,7 @@ const APP_NAME = "StudioLink";
 const RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const RUN_VALUE = "StudioLink";
 const UNINSTALL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\StudioLink";
+const CLI_COMMANDS = new Set(["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "autostart", "logs", "help", "--help", "-h"]);
 
 export function defaultInstallDir(env: SelfInstallEnv = process.env, home = homedir()): string {
   const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
@@ -60,10 +61,39 @@ export function hasEmbeddedRoAgent(): boolean {
   return existsSync(embeddedRoAgentAssetPath());
 }
 
+export function commandShimContents(daemonPath: string): string {
+  return `@echo off\r\nsetlocal\r\nif "%~1"=="" (\r\n  ${JSON.stringify(daemonPath)} start\r\n) else (\r\n  ${JSON.stringify(daemonPath)} %*\r\n)\r\n`;
+}
+
+export function pathListContains(pathValue: string | undefined, entry: string): boolean {
+  const expected = canonicalPath(entry);
+  return (pathValue || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .some((part) => canonicalPath(part) === expected);
+}
+
+export function addPathEntry(pathValue: string | undefined, entry: string): string {
+  const parts = (pathValue || "").split(";").map((part) => part.trim()).filter(Boolean);
+  if (!pathListContains(pathValue, entry)) parts.push(entry);
+  return parts.join(";");
+}
+
+export function removePathEntry(pathValue: string | undefined, entry: string): string {
+  const expected = canonicalPath(entry);
+  return (pathValue || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => canonicalPath(part) !== expected)
+    .join(";");
+}
+
 export function shouldRunSelfInstall(argv: string[], platform = process.platform, execPath = process.execPath, installDir = defaultInstallDir()): boolean {
   if (!isPackagedWindowsDaemon(platform, execPath)) return false;
   const command = argv[2]?.toLowerCase();
-  if (["install", "uninstall", "repair", "start", "status"].includes(command || "")) return true;
+  if (CLI_COMMANDS.has(command || "")) return true;
   return !command && !isInstalledPath(execPath, installDir);
 }
 
@@ -76,7 +106,13 @@ export function handleSelfInstallCommand(version: string): boolean {
     else if (command === "repair") install(version, options);
     else if (command === "uninstall") uninstall(options);
     else if (command === "start") startInstalled();
+    else if (command === "stop") stopDaemon();
+    else if (command === "restart") restartDaemon();
     else if (command === "status") printStatus(version);
+    else if (command === "settings") printSettings(version);
+    else if (command === "autostart") handleAutostart(process.argv[3]);
+    else if (command === "logs") printLogs();
+    else if (command === "help" || command === "--help" || command === "-h") printHelp();
     else install(version, options);
   } catch (error) {
     console.error(`[StudioLink] ${command} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -101,13 +137,17 @@ function install(version: string, options: SelfInstallOptions): void {
 
   const roAgentInstalled = installRoAgent(installDir);
 
+  installCommandShim(installDir, daemonDest);
+  addInstallDirToUserPath(installDir);
   writeUninstallRegistry(version, daemonDest);
   if (options.autostart) enableAutostart(daemonDest);
   else disableAutostart();
 
-  startProcess(daemonDest);
+  const child = startProcess(daemonDest);
   openUrl("https://rblxagent.com/download?installed=1");
   console.log(`[StudioLink] Installed to ${installDir}`);
+  console.log(`[StudioLink] Daemon start requested${child.pid ? ` (pid ${child.pid})` : ""}.`);
+  console.log(`[StudioLink] If http://127.0.0.1:45678/health is unavailable, inspect ${daemonLogPaths().stderr}.`);
   if (!roAgentInstalled) console.warn("[StudioLink] roagent.exe was not embedded or found next to the daemon. Launch RoAgent from Studio after placing roagent.exe in the installed roagent folder.");
   pauseIfInteractive();
 }
@@ -133,6 +173,7 @@ function uninstall(options: SelfInstallOptions): void {
   const installDir = defaultInstallDir();
   disableAutostart();
   deleteRegistryTree(UNINSTALL_KEY);
+  removeInstallDirFromUserPath(installDir);
   if (options.deleteData) rmSync(defaultDataDir(), { recursive: true, force: true });
 
   const cleanup = join(process.env.TEMP || installDir, `studiolink-uninstall-${Date.now()}.ps1`);
@@ -144,19 +185,157 @@ function uninstall(options: SelfInstallOptions): void {
 function startInstalled(): void {
   const daemon = join(defaultInstallDir(), "studiolink-daemon.exe");
   if (!existsSync(daemon)) throw new Error(`Installed daemon not found at ${daemon}`);
-  startProcess(daemon);
-  console.log("[StudioLink] Daemon started.");
+  const child = startProcess(daemon);
+  console.log(`[StudioLink] Daemon start requested${child.pid ? ` (pid ${child.pid})` : ""}.`);
+  console.log(`[StudioLink] Logs: ${daemonLogPaths().stdout} and ${daemonLogPaths().stderr}`);
+}
+
+function stopDaemon(): void {
+  try {
+    execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Stop-Process -Force"], { stdio: "ignore", windowsHide: true });
+    console.log("[StudioLink] Daemon stopped.");
+  } catch {
+    console.log("[StudioLink] Daemon was not running or could not be stopped.");
+  }
+}
+
+function restartDaemon(): void {
+  stopDaemon();
+  startInstalled();
 }
 
 function printStatus(version: string): void {
   const installDir = defaultInstallDir();
   const daemon = join(installDir, "studiolink-daemon.exe");
   const roagent = join(installDir, "roagent", "roagent.exe");
-  console.log(JSON.stringify({ version, installDir, installed: existsSync(daemon), roAgentInstalled: existsSync(roagent) }, null, 2));
+  const commandShim = join(installDir, "StudioLink.cmd");
+  console.log(JSON.stringify({
+    version,
+    installDir,
+    installed: existsSync(daemon),
+    roAgentInstalled: existsSync(roagent),
+    commandShim,
+    commandInstalled: existsSync(commandShim),
+    userPathConfigured: pathListContains(readUserPath(), installDir),
+    autostartEnabled: isAutostartEnabled(daemon),
+    logs: daemonLogPaths(),
+  }, null, 2));
 }
 
-function startProcess(file: string): void {
-  spawn(file, [], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+function printSettings(version: string): void {
+  const installDir = defaultInstallDir();
+  const daemon = join(installDir, "studiolink-daemon.exe");
+  const logs = daemonLogPaths();
+  console.log(`StudioLink ${version}`);
+  console.log(`Install dir: ${installDir}`);
+  console.log(`Data dir: ${defaultDataDir()}`);
+  console.log(`Daemon installed: ${existsSync(daemon)}`);
+  console.log(`Command installed: ${existsSync(join(installDir, "StudioLink.cmd"))}`);
+  console.log(`PATH configured: ${pathListContains(readUserPath(), installDir)}`);
+  console.log(`Autostart enabled: ${isAutostartEnabled(daemon)}`);
+  console.log(`Stdout log: ${logs.stdout}`);
+  console.log(`Stderr log: ${logs.stderr}`);
+  console.log("Commands: StudioLink, StudioLink status, StudioLink start, StudioLink stop, StudioLink restart, StudioLink autostart on|off|status, StudioLink logs, StudioLink uninstall");
+}
+
+function printLogs(): void {
+  const logs = daemonLogPaths();
+  console.log(`Stdout log: ${logs.stdout}`);
+  console.log(`Stderr log: ${logs.stderr}`);
+  console.log(`Tail errors: Get-Content ${JSON.stringify(logs.stderr)} -Tail 80`);
+}
+
+function printHelp(): void {
+  console.log(`StudioLink terminal interface
+
+Usage:
+  StudioLink                         Start the daemon in the background
+  StudioLink run                     Run the daemon in the foreground for debugging
+  StudioLink status                  Show install/daemon status as JSON
+  StudioLink settings                Show install paths, logs, PATH, and autostart
+  StudioLink start                   Start the daemon in the background
+  StudioLink stop                    Stop the daemon
+  StudioLink restart                 Restart the daemon
+  StudioLink autostart status        Show Windows login autostart state
+  StudioLink autostart on            Enable Windows login autostart
+  StudioLink autostart off           Disable Windows login autostart
+  StudioLink logs                    Show daemon log paths
+  StudioLink uninstall               Uninstall StudioLink
+  StudioLink repair                  Reinstall shim, PATH, autostart, and files
+`);
+}
+
+function daemonLogPaths(): { stdout: string; stderr: string } {
+  const logDir = join(defaultDataDir(), "logs");
+  return {
+    stdout: join(logDir, "daemon.stdout.log"),
+    stderr: join(logDir, "daemon.stderr.log"),
+  };
+}
+
+function startProcess(file: string): ReturnType<typeof spawn> {
+  const logs = daemonLogPaths();
+  mkdirSync(dirname(logs.stdout), { recursive: true });
+  const stdout = openSync(logs.stdout, "a");
+  const stderr = openSync(logs.stderr, "a");
+  const child = spawn(file, [], { cwd: dirname(file), detached: true, stdio: ["ignore", stdout, stderr], windowsHide: true });
+  child.unref();
+  return child;
+}
+
+function installCommandShim(installDir: string, daemonPath: string): void {
+  writeFileSync(join(installDir, "StudioLink.cmd"), commandShimContents(daemonPath), "utf8");
+}
+
+function readUserPath(): string {
+  try {
+    return execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Environment]::GetEnvironmentVariable('Path', 'User')"], { encoding: "utf8", windowsHide: true }).trim();
+  } catch {
+    return process.env.Path || process.env.PATH || "";
+  }
+}
+
+function writeUserPath(value: string): void {
+  execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Environment]::SetEnvironmentVariable('Path', $args[0], 'User')", value], { stdio: "ignore", windowsHide: true });
+}
+
+function addInstallDirToUserPath(installDir: string): void {
+  const current = readUserPath();
+  const next = addPathEntry(current, installDir);
+  if (next !== current) writeUserPath(next);
+}
+
+function removeInstallDirFromUserPath(installDir: string): void {
+  const current = readUserPath();
+  const next = removePathEntry(current, installDir);
+  if (next !== current) writeUserPath(next);
+}
+
+function handleAutostart(action: string | undefined): void {
+  const daemon = join(defaultInstallDir(), "studiolink-daemon.exe");
+  const normalized = (action || "status").toLowerCase();
+  if (normalized === "on" || normalized === "enable" || normalized === "enabled") {
+    if (!existsSync(daemon)) throw new Error(`Installed daemon not found at ${daemon}`);
+    enableAutostart(daemon);
+    console.log("[StudioLink] Autostart enabled.");
+    return;
+  }
+  if (normalized === "off" || normalized === "disable" || normalized === "disabled") {
+    disableAutostart();
+    console.log("[StudioLink] Autostart disabled.");
+    return;
+  }
+  if (normalized !== "status") throw new Error("Usage: StudioLink autostart on|off|status");
+  console.log(`[StudioLink] Autostart enabled: ${isAutostartEnabled(daemon)}`);
+}
+
+function isAutostartEnabled(daemonPath: string): boolean {
+  try {
+    const output = execFileSync("reg", ["query", RUN_KEY, "/v", RUN_VALUE], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+    return output.includes(daemonPath) || output.includes("studiolink-daemon");
+  } catch {
+    return false;
+  }
 }
 
 function enableAutostart(daemonPath: string): void {
