@@ -1,0 +1,32 @@
+{
+  "name": "roagent-server",
+  "version": "3.0.0",
+  "description": "RoAgent WebSocket daemon for Roblox Studio",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build:exe": "tsx build.ts",
+    "test": "vitest run",
+    "test:smoke": "vitest run ../tests/smoke.ts",
+    "test:git": "vitest run ../tests/git.test.ts",
+    "watch": "node ../tools/file-watcher-git.js"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0",
+    "pino": "^9.6.0",
+    "simple-git": "^3.36.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "@vercel/ncc": "^0.38.4",
+    "@yao-pkg/pkg": "^6.19.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

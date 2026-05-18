@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+
+USER_HOME="${HOME}"
+LAUNCH_DIR="${USER_HOME}/Library/LaunchAgents"
+LOG_DIR="${USER_HOME}/Library/Logs/StudioLink"
+PLIST="${LAUNCH_DIR}/com.studiolink.daemon.plist"
+
+mkdir -p "$LAUNCH_DIR" "$LOG_DIR" "${USER_HOME}/Library/Application Support/StudioLink"
+sed "s#__HOME__#${USER_HOME}#g" "/Library/StudioLink/com.studiolink.daemon.plist" > "$PLIST"
+chmod 644 "$PLIST"
+
+launchctl unload "$PLIST" >/dev/null 2>&1 || true
+launchctl load "$PLIST"
+
+if command -v osascript >/dev/null 2>&1; then
+  osascript -e 'display dialog "Configure your StudioLink AI API key from the StudioLink plugin settings. You may skip this step and configure it later." buttons {"OK"} default button "OK" with title "StudioLink API Key Setup"' >/dev/null 2>&1 || true
+fi
+
+if command -v node >/dev/null 2>&1; then
+  node /Library/StudioLink/health-check.js || true
+else
+  echo "Node is not available to run health-check.js. Visit https://studiolink.dev/troubleshooting if StudioLink does not start."
+fi
+
+exit 0

@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euo pipefail
+
+PLIST="$HOME/Library/LaunchAgents/com.studiolink.daemon.plist"
+launchctl unload "$PLIST" >/dev/null 2>&1 || true
+rm -f "$PLIST"
+sudo rm -f /usr/local/bin/studiolink-daemon /usr/local/bin/roagent /usr/local/bin/studiolink-uninstall
+sudo rm -rf /Library/StudioLink
+
+echo "StudioLink executables and launch agent removed."
+echo "To remove user data manually, delete: $HOME/Library/Application Support/StudioLink"
+echo "Logs may remain in: $HOME/Library/Logs/StudioLink"

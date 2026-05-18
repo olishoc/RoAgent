@@ -1,0 +1,42 @@
+{
+  "name": "RoAgent",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "RoAgent": {
+        "$path": "src/RoAgent.lua",
+        "Services": {
+          "$className": "Folder",
+          "ConfigService": { "$path": "src/Services/ConfigService.lua" },
+          "ThemeService": { "$path": "src/Services/ThemeService.lua" },
+          "EventBus": { "$path": "src/Services/EventBus.lua" },
+          "StateStore": { "$path": "src/Services/StateStore.lua" },
+          "SyntaxService": { "$path": "src/Services/SyntaxService.lua" },
+          "DiffService": { "$path": "src/Services/DiffService.lua" },
+          "HistoryService": { "$path": "src/Services/HistoryService.lua" },
+          "ScriptWriter": { "$path": "src/Services/ScriptWriter.lua" },
+          "AgentService": { "$path": "src/Services/AgentService.lua" },
+          "EditorService": { "$path": "src/Services/EditorService.lua" },
+          "FileSyncService": { "$path": "src/Services/FileSyncService.lua" }
+        },
+        "UI": {
+          "$className": "Folder",
+          "Components": { "$path": "src/UI/Components.lua" },
+          "EditorWidget": { "$path": "src/UI/EditorWidget.lua" },
+          "SuggestionPopup": { "$path": "src/UI/SuggestionPopup.lua" },
+          "CommitLogPanel": { "$path": "src/UI/CommitLogPanel.lua" },
+          "SettingsPanel": { "$path": "src/UI/SettingsPanel.lua" },
+          "ToolbarDropdown": { "$path": "src/UI/ToolbarDropdown.lua" }
+        }
+      }
+    },
+    "ReplicatedStorage": { "$className": "ReplicatedStorage" },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": { "$className": "StarterPlayerScripts" }
+    },
+    "Workspace": { "$className": "Workspace" },
+    "Lighting": { "$className": "Lighting" }
+  }
+}

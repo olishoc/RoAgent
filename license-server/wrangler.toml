@@ -1,0 +1,12 @@
+name = "studiolink-license-server"
+main = "src/index.ts"
+compatibility_date = "2026-05-16"
+
+# Production custom domain:
+# api.rblxagent.com -> this Worker
+routes = [
+  { pattern = "api.rblxagent.com", custom_domain = true }
+]
+
+[observability]
+enabled = true

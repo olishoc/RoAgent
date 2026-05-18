@@ -1,0 +1,50 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const repoRoot = path.resolve(new URL("..", import.meta.url).pathname);
+
+describe("plugin History UI Phase 2 foundation", () => {
+  it("has tabs, daemon history endpoints, deleted script restore, and live refresh hooks", () => {
+    const source = readFileSync(path.join(repoRoot, "plugin", "Panels", "History.lua"), "utf8");
+    expect(source).toContain('activeTab = "history"');
+    expect(source).toContain("Script History");
+    expect(source).toContain("Deleted Scripts");
+    expect(source).toContain("Git Snapshots");
+    expect(source).toContain("Git Snapshots / Repo Checkpoints");
+    expect(source).toContain("Automatic Script History");
+    expect(source).toContain("Search scripts, status, class...");
+    expect(source).toContain("Search script history by action, date, actor, or summary");
+    expect(source).toContain("Repo snapshot ·");
+    expect(source).toContain("Open");
+    expect(source).toContain("Script");
+    expect(source).toContain("function History:formatDate");
+    expect(source).toContain("function History:versionMatchesSearch");
+    expect(source).toContain("function History:commitUrl");
+    expect(source).toContain("function History:loadRepoDiff");
+    expect(source).toContain('self.manager:send("history:get"');
+    expect(source).toContain('self.manager:send("history:getDeleted"');
+    expect(source).toContain("lastVersionId");
+    expect(source).toContain("pendingStudioDeploy = true");
+    expect(source).toContain("Confirm Restore");
+    expect(source).toContain("function History:confirmRestore");
+    expect(source).toContain("function History:historyBucket");
+    expect(source).toContain("expandedHistoryGroups");
+    expect(source).toContain("self.selectedVersion.versionId");
+    expect(source).toContain("1100, 680, 520, 320");
+    expect(source).toContain("function History:updateLayout");
+    expect(source).toContain("GetPropertyChangedSignal(\"AbsoluteSize\")");
+    expect(source).toContain('"script:create:response"');
+    expect(source).toContain('"script:write:response"');
+    expect(source).toContain('"script:delete:response"');
+    expect(source).toContain('"script:rename:response"');
+    expect(source).toContain("self.Utils.stylePanel");
+    expect(source).toContain("self.Utils.animateIn(self.root)");
+    expect(source).toContain("version.actor");
+    expect(source).toContain("selectedScriptUniqueId");
+    expect(source).toContain("self.selectedVersion = nil");
+    expect(source).toContain("self.selectedVersion.versionId == version.versionId");
+    expect(source).not.toContain("row.BackgroundColor3 = changed[scriptRecord.path] and theme.yellow or theme.button");
+    expect(source).not.toContain('self.activeTab ~= "history" or not scriptRecord.deleted');
+  });
+});

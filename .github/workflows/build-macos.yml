@@ -1,0 +1,56 @@
+name: Build macOS Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "installer/macos/**"
+      - "installer/shared/**"
+      - "tools/build-roagent.mjs"
+      - ".github/workflows/build-macos.yml"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out RoAgent builder
+        uses: actions/checkout@v4
+        with:
+          repository: earendil-works/pi-mono
+          ref: 87881ca686a49004df7671125626bf9314e60469
+          path: roagent
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            server/package-lock.json
+            roagent/package-lock.json
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build daemon executable
+        run: |
+          cd server
+          npm ci
+          STUDIOLINK_TARGET_PLATFORM=darwin npm run build:exe
+
+      - name: Build RoAgent executable
+        run: |
+          cd roagent
+          npm ci
+          STUDIOLINK_TARGET_PLATFORM=darwin node ../tools/build-roagent.mjs
+
+      - name: Build pkg installer
+        run: installer/macos/build-pkg.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StudioLink-macos
+          path: dist/StudioLink.pkg

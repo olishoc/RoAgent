@@ -1,0 +1,56 @@
+name: Build Windows Self-Installing Daemon
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "tools/build-roagent.mjs"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out RoAgent builder
+        uses: actions/checkout@v4
+        with:
+          repository: earendil-works/pi-mono
+          ref: 87881ca686a49004df7671125626bf9314e60469
+          path: roagent
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            server/package-lock.json
+            roagent/package-lock.json
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build RoAgent executable
+        shell: pwsh
+        run: |
+          cd roagent
+          npm ci
+          $env:STUDIOLINK_TARGET_PLATFORM="win32"
+          node ..\tools\build-roagent.mjs
+
+      - name: Build self-installing daemon executable
+        shell: pwsh
+        run: |
+          cd server
+          npm ci
+          $env:STUDIOLINK_TARGET_PLATFORM="win32"
+          $env:STUDIOLINK_EMBED_ROAGENT_PATH="..\dist\roagent.exe"
+          npm run build:exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studiolink-daemon-windows-self-installing
+          path: dist/studiolink-daemon.exe

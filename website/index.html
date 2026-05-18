@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RblxAgent — AI tools for Roblox Studio</title>
+    <meta
+      name="description"
+      content="RblxAgent connects Roblox Studio to an AI coding agent so creators can inspect, edit, and version scripts faster."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">RblxAgent</p>
+        <h1>AI coding assistance for Roblox Studio.</h1>
+        <p class="lede">
+          RblxAgent links Roblox Studio with a local AI coding daemon, giving creators a faster way to review scripts,
+          apply edits, track history, and keep work organized.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="mailto:support@rblxagent.com?subject=RblxAgent%20access">Get access</a>
+          <a class="button" href="./download.html">Download</a>
+          <a class="button" href="./update.html">Update plugin</a>
+        </div>
+      </section>
+
+      <section class="cards" aria-label="Product highlights">
+        <article class="card">
+          <h2>Studio bridge</h2>
+          <p>Connects Roblox Studio to a local daemon over localhost HTTP RPC.</p>
+        </article>
+        <article class="card">
+          <h2>Script history</h2>
+          <p>Git-backed script tracking helps you understand changes and restore previous versions.</p>
+        </article>
+        <article class="card">
+          <h2>Agent workflow</h2>
+          <p>Open a RoAgent terminal with your synced place scripts ready to edit.</p>
+        </article>
+      </section>
+
+      <section class="notice">
+        <h2>Release channel</h2>
+        <p>Latest plugin downloads and update instructions are available on the Download and Update pages.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>© <span id="year"></span> RblxAgent</span>
+      <nav>
+        <a href="./download.html">Download</a>
+        <a href="./update.html">Update</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./terms.html">Terms</a>
+        <a href="mailto:support@rblxagent.com">Support</a>
+      </nav>
+    </footer>
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "port": 45678,
+  "dataDirectory": "data",
+  "logLevel": "info",
+  "licenseServerUrl": "https://api.rblxagent.com"
+}
