@@ -7,7 +7,7 @@
 	and StudioLink panels.
 --]]
 
-local PLUGIN_VERSION = "1.0.8"
+local PLUGIN_VERSION = "1.0.9"
 local SOURCE_DEBOUNCE_SECONDS = 0.5
 
 local HttpService = game:GetService("HttpService")
