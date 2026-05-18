@@ -14,6 +14,7 @@ function ConnectionManager.new(options)
 	self.placeInfo = options.placeInfo or {}
 	self.pluginVersion = options.pluginVersion or "1.0.0"
 	self.httpUrl = options.httpUrl or DEFAULT_HTTP_URL
+	self.downloadUrl = options.downloadUrl or "https://rblxagent.com/download"
 	self.mode = "http"
 	self.connected = false
 	self.connecting = false
@@ -26,6 +27,7 @@ function ConnectionManager.new(options)
 	self.scriptQueue = {}
 	self.lastHealth = nil
 	self.lastUpdateStatus = nil
+	self.daemonInstallPromptShown = false
 	return self
 end
 
@@ -382,6 +384,18 @@ function ConnectionManager:_startPolling()
 	end)
 end
 
+function ConnectionManager:_promptDaemonInstall(errorText)
+	if self.daemonInstallPromptShown then
+		return
+	end
+	self.daemonInstallPromptShown = true
+	self:_fire("daemon:missing", {
+		downloadUrl = self.downloadUrl,
+		error = tostring(errorText or ""),
+	})
+	self:_notify("StudioLink desktop app is not running. Open StudioLink to download and install it.")
+end
+
 function ConnectionManager:_scheduleReconnect()
 	if self.stopped then
 		return
@@ -408,9 +422,11 @@ function ConnectionManager:connect()
 	end)
 	if not ok then
 		self:_notify("StudioLink cannot reach daemon over HTTP: " .. tostring(result))
+		self:_promptDaemonInstall(result)
 		self:_scheduleReconnect()
 		return
 	end
+	self.daemonInstallPromptShown = false
 	self.connected = true
 	self.connecting = false
 	self.lastHealth = self.utils.decodeJson(result)

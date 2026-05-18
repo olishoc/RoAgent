@@ -57,6 +57,7 @@ local initialSnapshotSynced = false
 local panelsDisabled = false
 local suppressPanelCloseSetting = false
 local autoGithubRemoteAttempted = false
+local daemonPromptWidget = nil
 
 local function isScript(inst)
 	return inst and (inst:IsA("Script") or inst:IsA("LocalScript") or inst:IsA("ModuleScript"))
@@ -795,6 +796,102 @@ local function openMainPage(page, toggle)
 	openPanel("home", allowToggleClose, page)
 end
 
+local function showDaemonInstallPrompt(payload)
+	payload = payload or {}
+	if daemonPromptWidget then
+		daemonPromptWidget.Enabled = true
+		return
+	end
+	local info = DockWidgetPluginGuiInfo.new(
+		Enum.InitialDockState.Float,
+		true,
+		false,
+		420,
+		260,
+		360,
+		220
+	)
+	local widget = plugin:CreateDockWidgetPluginGui("StudioLinkDaemonInstallPrompt", info)
+	widget.Title = "StudioLink desktop app required"
+	daemonPromptWidget = widget
+	local theme = Theme.get()
+
+	local root = Instance.new("Frame")
+	root.BackgroundColor3 = theme.panel
+	root.BorderSizePixel = 0
+	root.Size = UDim2.fromScale(1, 1)
+	root.Parent = widget
+	Utils.ensureGradient(root, theme)
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 18)
+	padding.PaddingBottom = UDim.new(0, 18)
+	padding.PaddingLeft = UDim.new(0, 18)
+	padding.PaddingRight = UDim.new(0, 18)
+	padding.Parent = root
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 12)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = root
+
+	local title = Utils.makeLabel(root, "StudioLink desktop app required", 18, theme)
+	title.Font = Enum.Font.GothamSemibold
+	title.Size = UDim2.new(1, 0, 0, 28)
+	title.LayoutOrder = 1
+
+	local body = Utils.makeLabel(root, "StudioLink cannot connect to the desktop app. Install or start StudioLink, then return to Roblox Studio.", 13, theme, true)
+	body.Size = UDim2.new(1, 0, 0, 58)
+	body.LayoutOrder = 2
+
+	local errorText = tostring(payload.error or "")
+	if errorText ~= "" then
+		local errorLabel = Utils.makeLabel(root, "Connection detail: " .. errorText, 11, theme, true)
+		errorLabel.Size = UDim2.new(1, 0, 0, 42)
+		errorLabel.LayoutOrder = 3
+	end
+
+	local buttons = Instance.new("Frame")
+	buttons.BackgroundTransparency = 1
+	buttons.Size = UDim2.new(1, 0, 0, 36)
+	buttons.LayoutOrder = 4
+	buttons.Parent = root
+
+	local buttonLayout = Instance.new("UIListLayout")
+	buttonLayout.FillDirection = Enum.FillDirection.Horizontal
+	buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	buttonLayout.Padding = UDim.new(0, 10)
+	buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	buttonLayout.Parent = buttons
+
+	local download = Utils.makeButton(buttons, "Download StudioLink", theme, "primary")
+	download.Size = UDim2.new(0, 160, 0, 34)
+	download.LayoutOrder = 1
+	download.MouseButton1Click:Connect(function()
+		Utils.openUrl(plugin, tostring(payload.downloadUrl or "https://rblxagent.com/download"), connection)
+	end)
+
+	local retry = Utils.makeButton(buttons, "Retry", theme)
+	retry.Size = UDim2.new(0, 82, 0, 34)
+	retry.LayoutOrder = 2
+	retry.MouseButton1Click:Connect(function()
+		widget.Enabled = false
+		if connection then
+			connection.connecting = false
+			connection:connect()
+		end
+	end)
+
+	local dismiss = Utils.makeButton(buttons, "Dismiss", theme)
+	dismiss.Size = UDim2.new(0, 90, 0, 34)
+	dismiss.LayoutOrder = 3
+	dismiss.MouseButton1Click:Connect(function()
+		widget.Enabled = false
+	end)
+
+	widget.Enabled = true
+end
+
 local function buildToolbar()
 	local toolbar = plugin:CreateToolbar("StudioLink")
 	local homeButton = toolbar:CreateButton("Home", "Open StudioLink", "rbxassetid://6034509993")
@@ -842,6 +939,7 @@ if plugin then
 			openPanel("home")
 		end
 	end)
+	connection:on("daemon:missing", showDaemonInstallPrompt)
 	panels.home = HomePanel.new(plugin, connection, Theme, Utils, {
 		openHistory = function()
 			openMainPage("history")
