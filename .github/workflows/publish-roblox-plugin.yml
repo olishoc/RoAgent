@@ -1,0 +1,46 @@
+name: Publish Roblox Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Package only; do not publish to Roblox"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  publish-roblox-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify bundled plugin source
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('plugin/StudioLinkPlugin_Bundled.lua', 'utf8');
+          const checks = [
+            ['PLUGIN_VERSION = "1.0.9"', source.includes('PLUGIN_VERSION = "1.0.9"')],
+            ['missing daemon prompt', source.includes('StudioLink desktop app required')],
+            ['download URL', source.includes('https://rblxagent.com/download')],
+          ];
+          for (const [label, ok] of checks) {
+            console.log(`${ok ? 'OK' : 'FAIL'} ${label}`);
+            if (!ok) process.exitCode = 1;
+          }
+          NODE
+
+      - name: Publish Roblox plugin asset
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_PLUGIN_ASSET_ID: ${{ secrets.ROBLOX_PLUGIN_ASSET_ID }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node tools/publish-roblox-plugin.mjs
