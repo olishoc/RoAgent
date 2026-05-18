@@ -296,7 +296,7 @@ function readUserPath(): string {
 }
 
 function writeUserPath(value: string): void {
-  execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "[Environment]::SetEnvironmentVariable('Path', $args[0], 'User')", value], { stdio: "ignore", windowsHide: true });
+  execFileSync("reg", ["add", "HKCU\\Environment", "/v", "Path", "/t", "REG_EXPAND_SZ", "/d", value, "/f"], { stdio: "ignore", windowsHide: true });
 }
 
 function addInstallDirToUserPath(installDir: string): void {
