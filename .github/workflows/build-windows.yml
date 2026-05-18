@@ -50,6 +50,18 @@ jobs:
           $env:STUDIOLINK_EMBED_ROAGENT_PATH="..\dist\roagent.exe"
           npm run build:exe
 
+      - name: Verify self-install extracts RoAgent
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & ".\dist\studiolink-daemon.exe" install --no-autostart
+          $roagent = Join-Path $env:LOCALAPPDATA "Programs\StudioLink\roagent\roagent.exe"
+          if (!(Test-Path $roagent)) {
+            throw "roagent.exe was not extracted to $roagent"
+          }
+          & "$env:LOCALAPPDATA\Programs\StudioLink\studiolink-daemon.exe" status
+          & "$env:LOCALAPPDATA\Programs\StudioLink\studiolink-daemon.exe" uninstall
+
       - uses: actions/upload-artifact@v4
         with:
           name: studiolink-daemon-windows-self-installing

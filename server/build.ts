@@ -53,6 +53,7 @@ const entry = path.join(buildSrc, "server", "src", "index.ts");
 run("npx", ["ncc", "build", entry, "--out", nccOut, "--target", "es2022", "--transpile-only", "--external", "keytar"], path.join(buildSrc, "server"));
 
 const pkgJson = JSON.parse(readFileSync(path.join(serverRoot, "package.json"), "utf8")) as Record<string, unknown>;
+pkgJson.main = "index.js";
 pkgJson.bin = "index.js";
 if (platform === "win32") {
   const roAgentSource = process.env.STUDIOLINK_EMBED_ROAGENT_PATH || path.join(repoRoot, "dist", "roagent.exe");
@@ -60,7 +61,10 @@ if (platform === "win32") {
     const embeddedDir = path.join(nccOut, "embedded");
     mkdirSync(embeddedDir, { recursive: true });
     copyFileSync(roAgentSource, path.join(embeddedDir, "roagent.exe"));
-    pkgJson.pkg = { assets: ["embedded/**/*"] };
+    pkgJson.pkg = {
+      ...((typeof pkgJson.pkg === "object" && pkgJson.pkg !== null) ? pkgJson.pkg as Record<string, unknown> : {}),
+      assets: ["embedded/**/*"],
+    };
     console.log(`Embedded RoAgent from ${roAgentSource}`);
   } else {
     console.warn(`RoAgent executable not found at ${roAgentSource}; Windows daemon will self-install without embedded RoAgent.`);
@@ -69,7 +73,8 @@ if (platform === "win32") {
 writeFileSync(path.join(nccOut, "package.json"), JSON.stringify(pkgJson, null, 2), "utf8");
 
 const output = path.join(distDir, exeName);
-const pkgResult = spawnSync("npx", ["pkg", path.join(nccOut, "index.js"), "--targets", target, "--output", output], {
+const pkgInput = path.join(nccOut, "package.json");
+const pkgResult = spawnSync("npx", ["pkg", pkgInput, "--targets", target, "--output", output], {
   cwd: serverRoot,
   stdio: "inherit",
   shell: process.platform === "win32",
