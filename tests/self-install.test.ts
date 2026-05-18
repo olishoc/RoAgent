@@ -9,7 +9,9 @@ describe("self-install helpers", () => {
 
   it("detects packaged Windows daemon names", () => {
     expect(isPackagedWindowsDaemon("win32", "C:\\Downloads\\studiolink-daemon.exe")).toBe(true);
+    expect(isPackagedWindowsDaemon("win32", "C:\\Downloads\\studiolink-daemon (1).exe")).toBe(true);
     expect(isPackagedWindowsDaemon("win32", "C:\\Downloads\\StudioLinkSetup.exe")).toBe(true);
+    expect(isPackagedWindowsDaemon("win32", "C:\\Downloads\\StudioLinkSetup (2).exe")).toBe(true);
     expect(isPackagedWindowsDaemon("linux", "/tmp/studiolink-daemon")).toBe(false);
     expect(isPackagedWindowsDaemon("win32", "C:\\Downloads\\node.exe")).toBe(false);
   });
@@ -23,6 +25,7 @@ describe("self-install helpers", () => {
   it("runs installer when downloaded exe is double-clicked", () => {
     const dir = "C:\\Users\\Ada\\AppData\\Local\\Programs\\StudioLink";
     expect(shouldRunSelfInstall(["C:\\Downloads\\studiolink-daemon.exe"], "win32", "C:\\Downloads\\studiolink-daemon.exe", dir)).toBe(true);
+    expect(shouldRunSelfInstall(["C:\\Downloads\\studiolink-daemon (1).exe"], "win32", "C:\\Downloads\\studiolink-daemon (1).exe", dir)).toBe(true);
   });
 
   it("does not reinstall when installed daemon starts normally", () => {

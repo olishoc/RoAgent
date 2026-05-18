@@ -33,7 +33,9 @@ export function defaultDataDir(env: SelfInstallEnv = process.env, home = homedir
 }
 
 export function isPackagedWindowsDaemon(platform = process.platform, execPath = process.execPath): boolean {
-  return platform === "win32" && /(?:studiolink-daemon|studiolinksetup)\.exe$/i.test(execPath);
+  if (platform !== "win32") return false;
+  const name = execPath.split(/[\\/]/).pop() || "";
+  return /^studiolink-daemon(?:\s*\(\d+\))?\.exe$/i.test(name) || /^studiolinksetup(?:\s*\(\d+\))?\.exe$/i.test(name);
 }
 
 export function isInstalledPath(execPath: string, installDir: string): boolean {
