@@ -1,5 +1,5 @@
 // Generated from plugin/StudioLinkPlugin_Bundled.lua.
-export const PLUGIN_BUNDLE_VERSION = "1.0.8";
+export const PLUGIN_BUNDLE_VERSION = "1.0.9";
 export const PLUGIN_BUNDLE = String.raw`-- StudioLink bundled Roblox Studio plugin
 -- HTTP-primary build. Paste this whole file as a local plugin script.
 
