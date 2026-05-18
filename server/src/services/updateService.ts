@@ -33,6 +33,7 @@ export interface UpdateCheckResult {
   updateAvailable: boolean;
   platformKey: string;
   artifact?: ReleaseArtifact;
+  installedSha256?: string;
   canApply: boolean;
   reason?: string;
   releaseNotesUrl?: string;
@@ -89,6 +90,15 @@ function isPackagedDaemon(): boolean {
   return /studiolink-daemon(\.exe)?$/i.test(basename(process.execPath));
 }
 
+function installedExecutableSha256(): string | undefined {
+  try {
+    if (!isPackagedDaemon() || !existsSync(process.execPath)) return undefined;
+    return createHash("sha256").update(readFileSync(process.execPath)).digest("hex");
+  } catch {
+    return undefined;
+  }
+}
+
 function assertSafeArtifact(artifact: ReleaseArtifact): void {
   const url = new URL(artifact.url);
   if (url.protocol !== "https:") throw new Error("Update artifact URL must use HTTPS");
@@ -142,6 +152,7 @@ export async function checkForUpdate(config: Config, fetcher: typeof fetch = fet
   const latestVersion = manifest.daemonVersion || manifest.version;
   const artifact = selectArtifact(manifest, key);
   const latestReleaseTag = releaseTagFromArtifact(artifact);
+  const installedSha256 = installedExecutableSha256();
   let reason: string | undefined;
   let canApply = false;
   if (!artifact) reason = `No update artifact for ${key}`;
@@ -149,7 +160,11 @@ export async function checkForUpdate(config: Config, fetcher: typeof fetch = fet
     try {
       assertSafeArtifact(artifact);
       canApply = isPackagedDaemon();
-      if (!canApply) reason = "Automatic replacement is disabled while running from a development Node/tsx runtime.";
+      if (installedSha256 && installedSha256.toLowerCase() === artifact.sha256.toLowerCase()) {
+        canApply = false;
+        reason = "Installed daemon binary already matches the latest manifest artifact.";
+      }
+      if (!canApply && !reason) reason = "Automatic replacement is disabled while running from a development Node/tsx runtime.";
     } catch (error) {
       reason = error instanceof Error ? error.message : String(error);
     }
@@ -160,9 +175,10 @@ export async function checkForUpdate(config: Config, fetcher: typeof fetch = fet
     currentReleaseTag: BUILD_INFO.releaseTag,
     latestVersion,
     latestReleaseTag,
-    updateAvailable: Boolean((latestVersion && compareVersions(latestVersion, currentVersion) > 0) || (latestReleaseTag && BUILD_INFO.releaseTag !== "dev" && latestReleaseTag !== BUILD_INFO.releaseTag)),
+    updateAvailable: Boolean(((latestVersion && compareVersions(latestVersion, currentVersion) > 0) || (latestReleaseTag && BUILD_INFO.releaseTag !== "dev" && latestReleaseTag !== BUILD_INFO.releaseTag)) && (!installedSha256 || !artifact || installedSha256.toLowerCase() !== artifact.sha256.toLowerCase())),
     platformKey: key,
     artifact,
+    installedSha256,
     canApply,
     reason,
     releaseNotesUrl: manifest.releaseNotesUrl,

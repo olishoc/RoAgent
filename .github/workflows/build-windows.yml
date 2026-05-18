@@ -48,7 +48,7 @@ jobs:
           npm ci
           $env:STUDIOLINK_TARGET_PLATFORM="win32"
           $env:STUDIOLINK_EMBED_ROAGENT_PATH="..\dist\roagent.exe"
-          $env:STUDIOLINK_RELEASE_TAG="v3.0.0-rc.5"
+          $env:STUDIOLINK_RELEASE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}"
           $env:STUDIOLINK_COMMIT_SHA="${{ github.sha }}"
           $env:STUDIOLINK_BUILD_TIME=(Get-Date).ToUniversalTime().ToString("o")
           npm run build:exe
