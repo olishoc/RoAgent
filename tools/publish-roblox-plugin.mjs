@@ -119,6 +119,10 @@ async function pollOperation(operation) {
 if (!assetId) {
   fail("Missing ROBLOX_PLUGIN_ASSET_ID.");
 }
+const assetIdNumber = Number(assetId);
+if (!Number.isSafeInteger(assetIdNumber) || assetIdNumber <= 0) {
+  fail(`ROBLOX_PLUGIN_ASSET_ID must be a positive safe integer. Received: ${assetId}`);
+}
 if (!dryRun && !apiKey) {
   fail("Missing ROBLOX_API_KEY.");
 }
@@ -146,6 +150,7 @@ if (dryRun) {
 }
 
 const request = {
+  assetId: assetIdNumber,
   assetType,
   displayName,
   description,
