@@ -22,7 +22,7 @@ function run(command, args, cwd = roagentRoot) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-run("npm", ["run", "build"], codingAgent);
+run("npm", ["run", "build"], roagentRoot);
 
 const targetPlatform = process.env.STUDIOLINK_TARGET_PLATFORM ?? process.platform;
 const binaryName = targetPlatform === "win32" ? "roagent.exe" : "roagent";
