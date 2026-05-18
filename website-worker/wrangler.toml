@@ -14,9 +14,9 @@ PUBLIC_DOWNLOADS = "true"
 POLAR_PRODUCT_ID = "7f09de97-45f6-4ed0-96bd-f9bb449b7248"
 POLAR_SUCCESS_URL = "https://rblxagent.com/download?checkout_id={CHECKOUT_ID}"
 RESEND_FROM = "RblxAgent <support@rblxagent.com>"
-WINDOWS_DAEMON_URL = "https://github.com/olishoc/RoAgentTest/releases/download/v3.0.0/studiolink-daemon.exe"
-WINDOWS_DAEMON_SHA256 = "2298f7c9a7d09534ab269509b6c741d88de1f444104b6e658f148a5b41190d94"
-WINDOWS_DAEMON_SIZE = "45257456"
+WINDOWS_DAEMON_URL = "https://github.com/olishoc/RoAgent/releases/download/v3.0.0-rc.2/studiolink-daemon.exe"
+WINDOWS_DAEMON_SHA256 = "d8a0d987896cc46e2c85a695b6955e63d85877591de01c3e39d7e48b99eceaec"
+WINDOWS_DAEMON_SIZE = "157976799"
 
 # Add after creating Cloudflare resources:
 # [[r2_buckets]]
