@@ -60,6 +60,10 @@ export function embeddedRoAgentAssetPath(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "embedded", "roagent.exe");
 }
 
+function embeddedRoAgentPackagePath(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "embedded", "package.json");
+}
+
 export function hasEmbeddedRoAgent(): boolean {
   return existsSync(embeddedRoAgentAssetPath());
 }
@@ -164,14 +168,28 @@ function installRoAgent(installDir: string): boolean {
   const embedded = embeddedRoAgentAssetPath();
   if (existsSync(embedded)) {
     writeFileSync(roAgentDest, readFileSync(embedded));
+    installRoAgentPackageJson(roAgentDir);
     return true;
   }
   const adjacent = findAdjacentRoAgent();
   if (adjacent) {
     copyFileSync(adjacent, roAgentDest);
+    installRoAgentPackageJson(roAgentDir);
     return true;
   }
   return false;
+}
+
+function installRoAgentPackageJson(roAgentDir: string): void {
+  const dest = join(roAgentDir, "package.json");
+  const embeddedPackage = embeddedRoAgentPackagePath();
+  if (existsSync(embeddedPackage)) {
+    copyFileSync(embeddedPackage, dest);
+    return;
+  }
+  if (!existsSync(dest)) {
+    writeFileSync(dest, JSON.stringify({ name: "roagent", version: "0.1.0", description: "RoAgent — StudioLink AI assistant for Roblox Studio" }, null, 2), "utf8");
+  }
 }
 
 function uninstall(options: SelfInstallOptions): void {

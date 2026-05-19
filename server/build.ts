@@ -63,6 +63,13 @@ if (platform === "win32") {
     const embeddedDir = path.join(nccOut, "embedded");
     mkdirSync(embeddedDir, { recursive: true });
     copyFileSync(roAgentSource, path.join(embeddedDir, "roagent.exe"));
+    const roAgentPackageSource = process.env.STUDIOLINK_EMBED_ROAGENT_PACKAGE_PATH || path.join(repoRoot, "roagent", "packages", "coding-agent", "package.json");
+    if (existsSync(roAgentPackageSource)) {
+      copyFileSync(roAgentPackageSource, path.join(embeddedDir, "package.json"));
+      console.log(`Embedded RoAgent package metadata from ${roAgentPackageSource}`);
+    } else {
+      console.warn(`RoAgent package metadata not found at ${roAgentPackageSource}; embedded RoAgent may not launch.`);
+    }
     pkgJson.pkg = {
       ...((typeof pkgJson.pkg === "object" && pkgJson.pkg !== null) ? pkgJson.pkg as Record<string, unknown> : {}),
       assets: ["embedded/**/*"],

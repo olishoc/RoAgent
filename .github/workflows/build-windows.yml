@@ -2,6 +2,11 @@ name: Build Windows Self-Installing Daemon
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag embedded in the daemon, e.g. v3.0.0-rc.8"
+        required: false
+        default: "dev"
   push:
     branches: [main]
     paths:
@@ -48,7 +53,12 @@ jobs:
           npm ci
           $env:STUDIOLINK_TARGET_PLATFORM="win32"
           $env:STUDIOLINK_EMBED_ROAGENT_PATH="..\dist\roagent.exe"
-          $env:STUDIOLINK_RELEASE_TAG="${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}"
+          $releaseTag = "${{ github.event.inputs.release_tag || 'dev' }}"
+          if ($releaseTag -eq "dev") {
+            $tagAtHead = git tag --points-at HEAD | Where-Object { $_ -match '^v\d+\.\d+\.\d+' } | Select-Object -First 1
+            if ($tagAtHead) { $releaseTag = $tagAtHead }
+          }
+          $env:STUDIOLINK_RELEASE_TAG=$releaseTag
           $env:STUDIOLINK_COMMIT_SHA="${{ github.sha }}"
           $env:STUDIOLINK_BUILD_TIME=(Get-Date).ToUniversalTime().ToString("o")
           npm run build:exe
