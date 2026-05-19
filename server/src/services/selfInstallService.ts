@@ -191,10 +191,15 @@ function copyFileWithRetry(src: string, dest: string): void {
 function stopInstalledDaemonForReplace(daemonPath: string): void {
   try {
     execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $args[0] } | Stop-Process -Force", daemonPath], { stdio: "ignore", windowsHide: true });
-    sleepMs(1200);
   } catch {
-    // If process inspection fails, the retry loop still handles a transient lock.
+    // Fall through to image-name kill below.
   }
+  try {
+    execFileSync("taskkill.exe", ["/IM", "studiolink-daemon.exe", "/F"], { stdio: "ignore", windowsHide: true });
+  } catch {
+    // No exact installed daemon process was running, or Windows already stopped it.
+  }
+  sleepMs(1800);
 }
 
 function installRoAgent(installDir: string): boolean {
