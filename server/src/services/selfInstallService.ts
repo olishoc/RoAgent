@@ -142,7 +142,10 @@ function install(version: string, options: SelfInstallOptions): void {
   const installDir = defaultInstallDir();
   const daemonDest = join(installDir, "studiolink-daemon.exe");
   mkdirSync(installDir, { recursive: true });
-  if (!isInstalledPath(process.execPath, installDir)) copyFileSync(process.execPath, daemonDest);
+  if (!isInstalledPath(process.execPath, installDir)) {
+    stopInstalledDaemonForReplace(daemonDest);
+    copyFileWithRetry(process.execPath, daemonDest);
+  }
 
   const roAgentInstalled = installRoAgent(installDir);
 
@@ -159,6 +162,39 @@ function install(version: string, options: SelfInstallOptions): void {
   console.log(`[StudioLink] If http://127.0.0.1:45678/health is unavailable, inspect ${daemonLogPaths().stderr}.`);
   if (!roAgentInstalled) console.warn("[StudioLink] roagent.exe was not embedded or found next to the daemon. Launch RoAgent from Studio after placing roagent.exe in the installed roagent folder.");
   pauseIfInteractive();
+}
+
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function isBusyCopyError(error: unknown): boolean {
+  const code = (error as { code?: string } | undefined)?.code;
+  return code === "EBUSY" || code === "EPERM" || code === "EACCES";
+}
+
+function copyFileWithRetry(src: string, dest: string): void {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 10; attempt += 1) {
+    try {
+      copyFileSync(src, dest);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isBusyCopyError(error) || attempt === 10) break;
+      sleepMs(500);
+    }
+  }
+  throw lastError;
+}
+
+function stopInstalledDaemonForReplace(daemonPath: string): void {
+  try {
+    execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $args[0] } | Stop-Process -Force", daemonPath], { stdio: "ignore", windowsHide: true });
+    sleepMs(1200);
+  } catch {
+    // If process inspection fails, the retry loop still handles a transient lock.
+  }
 }
 
 function installRoAgent(installDir: string): boolean {
