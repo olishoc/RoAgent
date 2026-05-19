@@ -190,14 +190,17 @@ function copyFileWithRetry(src: string, dest: string): void {
 
 function stopInstalledDaemonForReplace(daemonPath: string): void {
   try {
-    execFileSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $args[0] } | Stop-Process -Force", daemonPath], { stdio: "ignore", windowsHide: true });
+    execFileSync("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      "$target = $args[0]; $current = [int]$args[1]; Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $current -and ($_.Path -eq $target -or $_.Path -eq $null) } | Stop-Process -Force",
+      daemonPath,
+      String(process.pid),
+    ], { stdio: "ignore", windowsHide: true });
   } catch {
-    // Fall through to image-name kill below.
-  }
-  try {
-    execFileSync("taskkill.exe", ["/IM", "studiolink-daemon.exe", "/F"], { stdio: "ignore", windowsHide: true });
-  } catch {
-    // No exact installed daemon process was running, or Windows already stopped it.
+    // If process inspection fails, the retry loop still handles a transient lock.
   }
   sleepMs(1800);
 }
