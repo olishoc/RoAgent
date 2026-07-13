@@ -11,7 +11,8 @@ This Cloudflare Worker serves `rblxagent.com` pages, release manifests, test dow
 - `GET /api/releases/studiolink.json` — daemon update manifest
 - `GET /api/releases` — plugin/daemon compatibility JSON
 - `POST /api/polar/webhook` — Polar order webhook
-- `GET /downloads/StudioLinkPlugin_Bundled.lua` — inline plugin bundle
+- `GET /downloads/StudioLinkPlugin_Bundled.lua` — inline bridge-only Roblox Studio plugin bundle
+- `GET /downloads/StudioLinkPlugin_LegacyUI.lua` — old in-Studio UI plugin fallback
 - `GET /downloads/studiolink-daemon.exe` — Windows self-installing daemon from R2 or fallback URL
 - `GET /downloads/StudioLink.pkg` — macOS installer from R2
 
@@ -101,6 +102,7 @@ wrangler deploy
 ```bash
 curl -i https://rblxagent.com/api/releases/studiolink.json
 curl -I https://rblxagent.com/downloads/StudioLinkPlugin_Bundled.lua
+curl -I https://rblxagent.com/downloads/StudioLinkPlugin_LegacyUI.lua
 curl -i https://rblxagent.com/downloads/studiolink-daemon.exe
 curl -i -X POST https://rblxagent.com/api/recover \
   -H 'content-type: application/json' \

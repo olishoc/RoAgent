@@ -4,15 +4,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { PROTOCOL_VERSION, type ProtocolMessage } from "../shared/protocol.ts";
 
-const repoRoot = path.resolve(new URL("..", import.meta.url).pathname);
+const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const serverRoot = path.join(repoRoot, "server");
 const port = 19000 + Math.floor(Math.random() * 1000);
 const token = "smoke-token";
 const dataDir = mkdtempSync(path.join(tmpdir(), "roagent-smoke-"));
 const placeId = "smoke-place";
+const npmExecutable = process.platform === "win32" ? "cmd.exe" : "npm";
+const npmStartArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm", "start"] : ["start"];
 
 let child: ChildProcess;
 let ws: WebSocket;
@@ -83,7 +86,7 @@ async function expectResponse(requestType: string, payload: object) {
 
 describe("RoAgent daemon smoke", () => {
   beforeAll(async () => {
-    child = spawn("npm", ["start"], {
+    child = spawn(npmExecutable, npmStartArgs, {
       cwd: serverRoot,
       env: {
         ...process.env,

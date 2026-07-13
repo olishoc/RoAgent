@@ -11,6 +11,7 @@ Source layout:
     History.lua
     AgentLog.lua
   Theme.lua
+  BridgeUtils.lua
   Utils.lua
 ```
 
@@ -21,7 +22,7 @@ Source layout:
 1. Start the StudioLink daemon on your machine.
 2. Copy the `/plugin/` files into a Roblox plugin project as ModuleScripts:
    - `main.lua` as the plugin entry Script/LocalPlugin source.
-   - `ConnectionManager.lua`, `Theme.lua`, and `Utils.lua` as children of the entry script.
+   - `ConnectionManager.lua`, `BridgeUtils.lua`, `Theme.lua`, and `Utils.lua` as children of the entry script.
    - `Panels/Home.lua`, `Panels/History.lua`, and `Panels/AgentLog.lua` under a `Panels` Folder child.
 3. The plugin bootstraps its auth token from loopback-only `/auth-token` and appends it as `?token=<token>` for local daemon mutations.
 4. Run the plugin in Studio. The toolbar should show `Home`, `History`, and `Agent Log`.
@@ -43,7 +44,7 @@ PluginScript
     AgentLog (ModuleScript)
 ```
 
-For a single-file publishing workflow, concatenate modules into a generated plugin script with a small module loader table, or use a Roblox plugin build tool that preserves the object hierarchy above. Do not hand-edit the preserved watcher/path/suppression code during bundling.
+For the default bridge-only local-plugin workflow, run `npm run build:plugin` and install `plugin/StudioLinkBridgeOnly_Bundled.lua`. The same command refreshes `website-worker/src/pluginBundle.ts` so `/downloads/StudioLinkPlugin_Bundled.lua` serves the bridge-only artifact while `/downloads/StudioLinkPlugin_LegacyUI.lua` remains available as a temporary fallback. Do not hand-edit generated bundles.
 
 ## Updating the plugin version
 

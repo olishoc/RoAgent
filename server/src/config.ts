@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -104,7 +105,7 @@ function loadOrCreateAuthToken(dataDirectory: string): string {
 }
 
 export function loadConfig(): Config {
-  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+  const repoRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
   const defaults = readDefaults(repoRoot);
   const port = parsePort(process.env.PLUGIN_PORT ?? defaults.port);
   const logLevel = parseLogLevel(process.env.PLUGIN_LOG_LEVEL ?? defaults.logLevel);

@@ -1,0 +1,52 @@
+name: Build Desktop Mission Control
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-desktop.yml"
+
+jobs:
+  build-desktop-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: choco install wixtoolset -y --no-progress
+
+      - name: Build Tauri desktop app
+        shell: pwsh
+        run: |
+          cd desktop
+          npm ci
+          npm run tauri:build
+
+      - name: Normalize installer filenames
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $nsis = Get-ChildItem desktop/src-tauri/target/release/bundle/nsis -Filter "*.exe" | Select-Object -First 1
+          if (!$nsis) { throw "No NSIS installer was produced" }
+          Copy-Item $nsis.FullName dist/RoAgentMissionControlSetup.exe
+          $msi = Get-ChildItem desktop/src-tauri/target/release/bundle/msi -Filter "*.msi" | Select-Object -First 1
+          if ($msi) { Copy-Item $msi.FullName dist/RoAgentMissionControlSetup.msi }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roagent-mission-control-windows
+          path: |
+            dist/RoAgentMissionControlSetup.exe
+            dist/RoAgentMissionControlSetup.msi

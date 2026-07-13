@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(new URL("..", import.meta.url).pathname);
+const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 function applyScriptListUpdatesBody(): string {
   const source = readFileSync(path.join(repoRoot, "plugin", "main.lua"), "utf8");

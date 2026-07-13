@@ -90,6 +90,12 @@ https://rblxagent.com/recover
 https://rblxagent.com/downloads/studiolink-daemon.exe
 https://rblxagent.com/downloads/StudioLink.pkg
 https://rblxagent.com/downloads/StudioLinkPlugin_Bundled.lua
+
+The default plugin download is now bridge-only. Use the legacy UI fallback only while migrating old Studio panel workflows:
+
+```text
+https://rblxagent.com/downloads/StudioLinkPlugin_LegacyUI.lua
+```
 ```
 
 Override for testing or private releases:

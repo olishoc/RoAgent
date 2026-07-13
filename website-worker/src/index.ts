@@ -1,4 +1,10 @@
-import { PLUGIN_BUNDLE, PLUGIN_BUNDLE_VERSION } from "./pluginBundle";
+import {
+  LEGACY_PLUGIN_BUNDLE,
+  LEGACY_PLUGIN_BUNDLE_FILE_NAME,
+  PLUGIN_BUNDLE,
+  PLUGIN_BUNDLE_FILE_NAME,
+  PLUGIN_BUNDLE_VERSION,
+} from "./pluginBundle";
 
 interface R2ObjectBody {
   body: ReadableStream;
@@ -16,6 +22,10 @@ interface KvLike {
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
 }
 
+interface DownloadKvLike {
+  get(key: string, options: { type: "arrayBuffer" }): Promise<ArrayBuffer | null>;
+}
+
 interface Env {
   POLAR_CHECKOUT_URL?: string;
   POLAR_ACCESS_TOKEN?: string;
@@ -24,6 +34,7 @@ interface Env {
   POLAR_WEBHOOK_SECRET?: string;
   PUBLIC_DOWNLOADS?: string;
   DOWNLOADS?: R2BucketLike;
+  DOWNLOADS_KV?: DownloadKvLike;
   ENTITLEMENTS?: KvLike;
   RESEND_API_KEY?: string;
   RESEND_FROM?: string;
@@ -32,6 +43,9 @@ interface Env {
   WINDOWS_INSTALLER_SHA256?: string;
   WINDOWS_INSTALLER_SIZE?: string;
   WINDOWS_DAEMON_URL?: string;
+  WINDOWS_APP_URL?: string;
+  WINDOWS_APP_SHA256?: string;
+  WINDOWS_APP_SIZE?: string;
   MACOS_PKG_URL?: string;
   MACOS_INSTALLER_SHA256?: string;
   MACOS_INSTALLER_SIZE?: string;
@@ -65,6 +79,12 @@ const ARTIFACTS = {
     fileName: "StudioLink.pkg",
     contentType: "application/octet-stream",
     platform: "darwin-universal",
+  },
+  desktop: {
+    key: `releases/${LATEST_DAEMON_VERSION}/windows/RoAgentMissionControlSetup.exe`,
+    fileName: "RoAgentMissionControlSetup.exe",
+    contentType: "application/vnd.microsoft.portable-executable",
+    platform: "win32-x64",
   },
 } as const;
 
@@ -114,13 +134,14 @@ function releasePayload(url: URL, env: Env): Record<string, unknown> {
     pluginIncompatible: compareVersions(pluginVersion, MIN_PLUGIN_VERSION) < 0,
     daemonIncompatible: compareVersions(daemonVersion, MIN_DAEMON_VERSION) < 0,
     updateUrl: updateUrl.toString(),
-    downloadUrl: `${url.origin}/downloads/StudioLinkPlugin_Bundled.lua`,
+    downloadUrl: `${url.origin}/downloads/${PLUGIN_BUNDLE_FILE_NAME}`,
     checkoutUrl: checkoutUrl(env),
   };
 }
 
 function daemonManifest(url: URL, env: Env): Record<string, unknown> {
   const artifacts: Record<string, unknown> = {};
+  const desktopApps: Record<string, unknown> = {};
   const windowsSha256 = env.WINDOWS_DAEMON_SHA256 || env.WINDOWS_INSTALLER_SHA256;
   if (windowsSha256) {
     artifacts[ARTIFACTS.windows.platform] = {
@@ -141,6 +162,15 @@ function daemonManifest(url: URL, env: Env): Record<string, unknown> {
     };
     artifacts["darwin-arm64"] = { ...(artifacts["darwin-x64"] as object), platform: "darwin-arm64" };
   }
+  if (env.WINDOWS_APP_SHA256 || env.WINDOWS_APP_URL) {
+    desktopApps[ARTIFACTS.desktop.platform] = {
+      platform: ARTIFACTS.desktop.platform,
+      version: LATEST_DAEMON_VERSION,
+      url: env.WINDOWS_APP_URL || `${url.origin}/downloads/${ARTIFACTS.desktop.fileName}`,
+      sha256: env.WINDOWS_APP_SHA256,
+      size: numberEnv(env.WINDOWS_APP_SIZE),
+    };
+  }
   return {
     version: LATEST_DAEMON_VERSION,
     daemonVersion: LATEST_DAEMON_VERSION,
@@ -151,6 +181,7 @@ function daemonManifest(url: URL, env: Env): Record<string, unknown> {
     releaseNotesUrl: `${url.origin}/update`,
     publicDownloads: publicDownloads(env),
     artifacts,
+    desktopApps,
   };
 }
 
@@ -176,12 +207,12 @@ function home(env: Env): Response {
 
 function download(env: Env): Response {
   const mode = publicDownloads(env) ? "Public test downloads are enabled." : "Purchase recovery links are required for daemon downloads.";
-  return page("Download RblxAgent", `<main><section class="hero"><p class="eyebrow">Download</p><h1>Install RblxAgent for Roblox Studio.</h1><p class="lede">Purchase access, download the Studio plugin bundle, and install the local daemon for your OS.</p><div class="actions"><a class="button primary" href="${checkoutUrl(env)}">Purchase / manage access</a><a class="button" href="/downloads/studiolink-daemon.exe">Windows self-installing daemon</a><a class="button" href="/downloads/StudioLink.pkg">macOS pkg</a><a class="button" href="/downloads/StudioLinkPlugin_Bundled.lua">Plugin bundle</a><a class="button" href="/recover">Recover downloads</a></div></section><section class="cards"><article class="card"><h2>Windows</h2><p>Double-click <span class="code">studiolink-daemon.exe</span>. It self-installs per-user, extracts bundled RoAgent, starts the daemon, and enables autostart.</p></article><article class="card"><h2>macOS</h2><p>Run <span class="code">StudioLink.pkg</span>. It installs the daemon and LaunchAgent.</p></article><article class="card"><h2>Roblox plugin</h2><p>Install <span class="code">StudioLinkPlugin_Bundled.lua</span> as a local Roblox Studio plugin.</p></article></section><section class="notice"><h2>Download mode</h2><p>${mode}</p></section></main>`);
+  return page("Download RblxAgent", `<main><section class="hero"><p class="eyebrow">Download</p><h1>Install RblxAgent for Roblox Studio.</h1><p class="lede">Purchase access, download the Mission Control app, install the bridge-only Studio plugin, and run the local daemon for your OS.</p><div class="actions"><a class="button primary" href="${checkoutUrl(env)}">Purchase / manage access</a><a class="button" href="/downloads/RoAgentMissionControlSetup.exe">Windows Mission Control app</a><a class="button" href="/downloads/studiolink-daemon.exe">Windows self-installing daemon</a><a class="button" href="/downloads/StudioLink.pkg">macOS pkg</a><a class="button" href="/downloads/${PLUGIN_BUNDLE_FILE_NAME}">Bridge plugin</a><a class="button" href="/recover">Recover downloads</a></div></section><section class="cards"><article class="card"><h2>Mission Control</h2><p>Install <span class="code">RoAgentMissionControlSetup.exe</span> for a desktop control panel that starts, repairs, and monitors the local daemon.</p></article><article class="card"><h2>Windows daemon</h2><p>Double-click <span class="code">studiolink-daemon.exe</span>. It self-installs per-user, extracts bundled RoAgent, starts the daemon, and enables autostart.</p></article><article class="card"><h2>macOS</h2><p>Run <span class="code">StudioLink.pkg</span>. It installs the daemon and LaunchAgent.</p></article><article class="card"><h2>Roblox plugin</h2><p>Install <span class="code">${PLUGIN_BUNDLE_FILE_NAME}</span> as a local Roblox Studio plugin. This default build only syncs Studio with Mission Control.</p></article></section><section class="notice"><h2>Download mode</h2><p>${mode}</p><p>Need the old in-Studio panels temporarily? Use <a href="/downloads/${LEGACY_PLUGIN_BUNDLE_FILE_NAME}">${LEGACY_PLUGIN_BUNDLE_FILE_NAME}</a>.</p></section></main>`);
 }
 
 function update(url: URL, env: Env): Response {
   const release = releasePayload(url, env);
-  return page("Update RblxAgent", `<main><section class="hero"><p class="eyebrow">Updater</p><h1>Update your RblxAgent plugin and daemon.</h1><p class="lede">Download the latest plugin bundle or daemon, then restart/reload Roblox Studio. The local daemon also reads the JSON release manifest.</p><div class="actions"><a class="button primary" href="/downloads/StudioLinkPlugin_Bundled.lua">Download latest plugin</a><a class="button" href="/downloads/studiolink-daemon.exe">Windows daemon</a><a class="button" href="/downloads/StudioLink.pkg">macOS pkg</a><a class="button" href="/api/releases/studiolink.json">Release manifest</a></div></section><section class="cards"><article class="card"><h2>Current plugin</h2><p><span class="code">${escapeHtml(String(release.pluginVersion))}</span></p></article><article class="card"><h2>Latest plugin</h2><p><span class="code">${LATEST_PLUGIN_VERSION}</span></p></article><article class="card"><h2>Daemon</h2><p>Current <span class="code">${escapeHtml(String(release.daemonVersion))}</span><br/>Latest <span class="code">${LATEST_DAEMON_VERSION}</span></p></article></section><section class="notice"><h2>After downloading</h2><p>Roblox Studio cannot silently hot-swap a running plugin. Save/replace the local plugin and reload Studio to use the new version.</p></section></main>`);
+  return page("Update RblxAgent", `<main><section class="hero"><p class="eyebrow">Updater</p><h1>Update your RblxAgent plugin and daemon.</h1><p class="lede">Download the latest bridge plugin, Mission Control app, or daemon, then restart/reload Roblox Studio. The local daemon also reads the JSON release manifest.</p><div class="actions"><a class="button primary" href="/downloads/${PLUGIN_BUNDLE_FILE_NAME}">Download bridge plugin</a><a class="button" href="/downloads/RoAgentMissionControlSetup.exe">Windows Mission Control app</a><a class="button" href="/downloads/studiolink-daemon.exe">Windows daemon</a><a class="button" href="/downloads/StudioLink.pkg">macOS pkg</a><a class="button" href="/api/releases/studiolink.json">Release manifest</a></div></section><section class="cards"><article class="card"><h2>Current plugin</h2><p><span class="code">${escapeHtml(String(release.pluginVersion))}</span></p></article><article class="card"><h2>Latest plugin</h2><p><span class="code">${LATEST_PLUGIN_VERSION}</span></p></article><article class="card"><h2>Daemon</h2><p>Current <span class="code">${escapeHtml(String(release.daemonVersion))}</span><br/>Latest <span class="code">${LATEST_DAEMON_VERSION}</span></p></article></section><section class="notice"><h2>After downloading</h2><p>Roblox Studio cannot silently hot-swap a running plugin. Save/replace the local plugin and reload Studio to use the new version.</p><p>Legacy UI fallback: <a href="/downloads/${LEGACY_PLUGIN_BUNDLE_FILE_NAME}">${LEGACY_PLUGIN_BUNDLE_FILE_NAME}</a>.</p></section></main>`);
 }
 
 function recoverPage(message = ""): Response {
@@ -199,7 +230,16 @@ async function handleDownload(url: URL, env: Env, kind: DownloadKind): Promise<R
   }
   const object = await env.DOWNLOADS?.get(artifact.key);
   if (!object) {
-    const fallbackUrl = kind === "windows" ? env.WINDOWS_DAEMON_URL : kind === "macos" ? env.MACOS_PKG_URL : undefined;
+    const kvObject = await env.DOWNLOADS_KV?.get(artifact.key, { type: "arrayBuffer" });
+    if (kvObject) {
+      const headers = new Headers({
+        "content-type": artifact.contentType,
+        "content-disposition": `attachment; filename=${artifact.fileName}`,
+        "cache-control": "private, max-age=60",
+      });
+      return new Response(kvObject, { headers });
+    }
+    const fallbackUrl = kind === "windows" ? env.WINDOWS_DAEMON_URL : kind === "macos" ? env.MACOS_PKG_URL : kind === "desktop" ? env.WINDOWS_APP_URL : undefined;
     if (fallbackUrl) return Response.redirect(fallbackUrl, 302);
     return page("Installer not uploaded — RblxAgent", `<main><section class="hero"><p class="eyebrow">Not uploaded yet</p><h1>${artifact.fileName} is not uploaded.</h1><p class="lede">The download route is working, but the installer artifact has not been uploaded to R2 key <span class="code">${artifact.key}</span>.</p><div class="actions"><a class="button" href="/download">Back to downloads</a></div></section></main>`, 404);
   }
@@ -265,17 +305,19 @@ async function handlePolarWebhook(request: Request, env: Env): Promise<Response>
 
 function publicDownloadLinks(origin: string): Record<string, string> {
   return {
+    desktop: `${origin}/downloads/${ARTIFACTS.desktop.fileName}`,
     windows: `${origin}/downloads/${ARTIFACTS.windows.fileName}`,
     macos: `${origin}/downloads/${ARTIFACTS.macos.fileName}`,
-    plugin: `${origin}/downloads/StudioLinkPlugin_Bundled.lua`,
+    plugin: `${origin}/downloads/${PLUGIN_BUNDLE_FILE_NAME}`,
   };
 }
 
 function gatedDownloadLinks(origin: string, token: string): Record<string, string> {
   return {
+    desktop: `${origin}/downloads/${ARTIFACTS.desktop.fileName}?token=${encodeURIComponent(token)}`,
     windows: `${origin}/downloads/${ARTIFACTS.windows.fileName}?token=${encodeURIComponent(token)}`,
     macos: `${origin}/downloads/${ARTIFACTS.macos.fileName}?token=${encodeURIComponent(token)}`,
-    plugin: `${origin}/downloads/StudioLinkPlugin_Bundled.lua`,
+    plugin: `${origin}/downloads/${PLUGIN_BUNDLE_FILE_NAME}`,
   };
 }
 
@@ -302,7 +344,7 @@ function normalizeEmail(email: string): string {
 async function sendRecoveryEmail(env: Env, email: string, links: Record<string, string>): Promise<void> {
   if (!env.RESEND_API_KEY) return;
   const from = env.RESEND_FROM || "RblxAgent <support@rblxagent.com>";
-  const html = `<p>Your RblxAgent downloads:</p><ul><li><a href="${links.windows}">Windows setup</a></li><li><a href="${links.macos}">macOS pkg</a></li><li><a href="${links.plugin}">Roblox plugin</a></li></ul>`;
+  const html = `<p>Your RblxAgent downloads:</p><ul><li><a href="${links.desktop}">Windows Mission Control app</a></li><li><a href="${links.windows}">Windows daemon</a></li><li><a href="${links.macos}">macOS pkg</a></li><li><a href="${links.plugin}">Roblox plugin</a></li></ul>`;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
@@ -391,9 +433,13 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (request.method === "GET" && url.pathname === "/api/releases") return json(releasePayload(url, env));
   if (request.method === "GET" && url.pathname === "/checkout") return handleCheckout(request, env);
   if (request.method === "POST" && url.pathname === "/api/polar/webhook") return handlePolarWebhook(request, env);
-  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/downloads/StudioLinkPlugin_Bundled.lua") {
-    return new Response(request.method === "HEAD" ? null : PLUGIN_BUNDLE, { headers: { "content-type": "text/plain; charset=utf-8", "content-disposition": "attachment; filename=StudioLinkPlugin_Bundled.lua", "cache-control": "public, max-age=300" } });
+  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === `/downloads/${PLUGIN_BUNDLE_FILE_NAME}`) {
+    return pluginDownloadResponse(request, PLUGIN_BUNDLE, PLUGIN_BUNDLE_FILE_NAME);
   }
+  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === `/downloads/${LEGACY_PLUGIN_BUNDLE_FILE_NAME}`) {
+    return pluginDownloadResponse(request, LEGACY_PLUGIN_BUNDLE, LEGACY_PLUGIN_BUNDLE_FILE_NAME);
+  }
+  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/downloads/RoAgentMissionControlSetup.exe") return handleDownload(url, env, "desktop");
   if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/downloads/studiolink-daemon.exe" || url.pathname === "/downloads/StudioLinkSetup.exe")) return handleDownload(url, env, "windows");
   if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/downloads/StudioLink.pkg") return handleDownload(url, env, "macos");
   if (request.method === "GET" && url.pathname === "/download") return download(env);
@@ -412,4 +458,20 @@ export default {
   },
 };
 
+export class RemoteDesktop {
+  fetch(): Response {
+    return new Response("RoAgent site does not use remote desktop sessions.", { status: 410 });
+  }
+}
+
 export { route as handleWebsiteRequest, hmacSha256Hex };
+
+function pluginDownloadResponse(request: Request, body: string, fileName: string): Response {
+  return new Response(request.method === "HEAD" ? null : body, {
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "content-disposition": `attachment; filename=${fileName}`,
+      "cache-control": "public, max-age=300",
+    },
+  });
+}

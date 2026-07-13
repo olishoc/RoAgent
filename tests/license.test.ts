@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Config } from "../server/src/config.ts";
 import { LicenseManager, type LicenseServerResponse } from "../server/src/services/licenseManager.ts";
 import { AppError } from "../server/src/errors.ts";
@@ -14,7 +15,7 @@ function config(dataDirectory: string): Config {
     dataDirectory,
     logLevel: "error",
     authToken: "license-test-token",
-    repoRoot: path.resolve(new URL("..", import.meta.url).pathname),
+    repoRoot: path.resolve(fileURLToPath(new URL("..", import.meta.url))),
     startedAt: new Date().toISOString(),
   };
 }

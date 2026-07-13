@@ -108,6 +108,24 @@ The daemon can push these messages without a matching client request:
 }
 ```
 
+### Project summary
+
+```json
+{
+  "placeId": "134109928056755",
+  "placeName": "Obby Test Place",
+  "gameId": "987654321",
+  "jobId": "abc",
+  "placeDir": "C:\\Users\\user\\AppData\\Roaming\\StudioLink\\places\\134109928056755",
+  "repoDir": "C:\\Users\\user\\AppData\\Roaming\\StudioLink\\repos\\134109928056755",
+  "hasRepo": true,
+  "active": true,
+  "scriptsCount": 12,
+  "totalBytes": 48000,
+  "updatedAt": "2026-05-15T19:13:38.833Z"
+}
+```
+
 ### History version
 
 ```json
@@ -394,9 +412,147 @@ Common errors: `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
 ---
 
-## 4. History Operations
+## 4. Project Operations
 
-### 4.1 `history:get`
+Project operations are editor/desktop-oriented wrappers around place-scoped script state. They let StudioLink clients discover Roblox projects and operate on scripts without relying on local cache-file parsing.
+
+### 4.1 `project:list`
+
+List synced Roblox projects known to the daemon.
+
+**Direction:** client -> server
+
+Request:
+
+```json
+{
+  "includeInactive": false
+}
+```
+
+Response type: `project:list:response`
+
+```json
+{
+  "projects": [
+    {
+      "placeId": "134109928056755",
+      "placeName": "Obby Test Place",
+      "placeDir": "C:\\Users\\user\\AppData\\Roaming\\StudioLink\\places\\134109928056755",
+      "repoDir": "C:\\Users\\user\\AppData\\Roaming\\StudioLink\\repos\\134109928056755",
+      "hasRepo": true,
+      "active": true,
+      "scriptsCount": 12,
+      "totalBytes": 48000,
+      "updatedAt": "2026-05-15T19:13:38.833Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+Common errors: `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
+
+### 4.2 `project:scripts`
+
+List scripts for a project. `placeId` may be supplied in the request envelope or in the payload for global clients.
+
+**Direction:** client -> server
+
+Request:
+
+```json
+{
+  "placeId": "134109928056755",
+  "includeSource": true,
+  "includeDeleted": false
+}
+```
+
+Response type: `project:scripts:response`
+
+```json
+{
+  "project": { "placeId": "134109928056755", "scriptsCount": 12, "totalBytes": 48000 },
+  "scripts": [
+    { "path": "ServerScriptService.Main", "className": "Script", "source": "print('hello')", "size": 14, "versionId": "42", "updatedAt": "2026-05-15T19:13:38.833Z", "deleted": false }
+  ],
+  "count": 1,
+  "totalBytes": 14
+}
+```
+
+Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
+
+### 4.3 `project:read`
+
+Read one script from a project.
+
+**Direction:** client -> server
+
+Request:
+
+```json
+{
+  "placeId": "134109928056755",
+  "path": "ServerScriptService.Main"
+}
+```
+
+Response type: `project:read:response`
+
+```json
+{
+  "project": { "placeId": "134109928056755", "scriptsCount": 12, "totalBytes": 48000 },
+  "script": {
+    "path": "ServerScriptService.Main",
+    "className": "Script",
+    "source": "print('hello')",
+    "size": 14,
+    "versionId": "42",
+    "updatedAt": "2026-05-15T19:13:38.833Z",
+    "deleted": false
+  }
+}
+```
+
+Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
+
+### 4.4 `project:write`
+
+Write a script through the project API. This delegates to the normal script write path and can mark the edit for Studio deployment.
+
+**Direction:** client -> server
+
+Request:
+
+```json
+{
+  "placeId": "134109928056755",
+  "path": "ServerScriptService.Main",
+  "source": "print('from StudioLink Code')",
+  "pendingStudioDeploy": true,
+  "summary": "Update from StudioLink Code"
+}
+```
+
+Response type: `project:write:response`
+
+```json
+{
+  "project": { "placeId": "134109928056755", "scriptsCount": 12, "totalBytes": 48000 },
+  "script": { "path": "ServerScriptService.Main", "className": "Script", "source": "print('from StudioLink Code')", "size": 29, "versionId": "43", "updatedAt": "2026-05-15T19:20:00.000Z", "deleted": false, "pendingStudioDeploy": true },
+  "historyVersion": { "versionId": "43", "path": "ServerScriptService.Main", "className": "Script", "action": "updated", "timestamp": "2026-05-15T19:20:00.000Z", "summary": "Update from StudioLink Code", "actor": "studio-plugin" }
+}
+```
+
+Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
+
+---
+
+## 5. History Operations
+
+### 5.1 `history:get`
 
 Get the full modification history for one script.
 
@@ -426,7 +582,7 @@ If `includeSource` is false, version objects may omit `source`.
 
 Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 4.2 `history:getDeleted`
+### 5.2 `history:getDeleted`
 
 Get deleted scripts with their last known content.
 
@@ -463,9 +619,9 @@ Common errors: `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
 ---
 
-## 5. Watch Operations
+## 6. Watch Operations
 
-### 5.1 `watch:subscribe`
+### 6.1 `watch:subscribe`
 
 Subscribe to real-time changes for a place.
 
@@ -494,7 +650,7 @@ After subscription, the server may push `watch:event` messages for the same `pla
 
 Common errors: `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 5.2 `watch:unsubscribe`
+### 6.2 `watch:unsubscribe`
 
 Unsubscribe from real-time changes.
 
@@ -519,7 +675,7 @@ Response type: `watch:unsubscribe:response`
 
 Common errors: `NOT_FOUND`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 5.3 `watch:event`
+### 6.3 `watch:event`
 
 Real-time place change push.
 
@@ -544,11 +700,11 @@ Push payload:
 
 ---
 
-## 6. Git Operations
+## 7. Git Operations
 
 Git operations are scoped to the repository associated with the envelope `placeId`. File statuses are one of `added`, `modified`, `deleted`, `renamed`, `copied`, `staged`, `untracked`, or `conflicted`.
 
-### 6.1 `git:status`
+### 7.1 `git:status`
 
 Get current git status of the place repository.
 
@@ -572,7 +728,7 @@ Response type: `git:status:response`
 
 Common errors: `PERMISSION_DENIED`, `GIT_CONFLICT`, `INTERNAL_ERROR`.
 
-### 6.2 `git:commit`
+### 7.2 `git:commit`
 
 Commit current state with a message. If `message` is omitted, the daemon generates `auto: <N> files changed at <timestamp>`.
 
@@ -596,7 +752,7 @@ Response type: `git:commit:response`
 
 Common errors: `PERMISSION_DENIED`, `GIT_CONFLICT`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 6.3 `git:log`
+### 7.3 `git:log`
 
 Get git log for the place. The daemon returns at most the last 50 commits.
 
@@ -622,7 +778,7 @@ Response type: `git:log:response`
 
 Common errors: `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
-### 6.4 `git:diff`
+### 7.4 `git:diff`
 
 Get diff for a specific script between two commits. If `toCommit` is omitted, the daemon compares `fromCommit` to the working tree.
 
@@ -649,7 +805,7 @@ Response type: `git:diff:response`
 
 Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 6.5 `git:restore`
+### 7.5 `git:restore`
 
 Restore a script to a specific commit.
 
@@ -675,7 +831,7 @@ Response type: `git:restore:response`
 
 Common errors: `NOT_FOUND`, `PERMISSION_DENIED`, `GIT_CONFLICT`, `INTERNAL_ERROR`.
 
-### 6.6 `git:push`
+### 7.6 `git:push`
 
 Push the place repo to remote.
 
@@ -701,7 +857,7 @@ Response type: `git:push:response`
 
 Common errors: `PERMISSION_DENIED`, `GIT_CONFLICT`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 6.7 `git:pull`
+### 7.7 `git:pull`
 
 Pull from remote using rebase. If a conflict occurs, the daemon returns `GIT_CONFLICT` with `details.conflictingFiles`.
 
@@ -729,7 +885,7 @@ Response type: `git:pull:response`
 
 Common errors: `PERMISSION_DENIED`, `GIT_CONFLICT`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 6.8 `git:setRemote`
+### 7.8 `git:setRemote`
 
 Set the remote URL for the place repo. `remote` defaults to `origin`. Clients may send `remoteUrl` or legacy `url`. Only `https://` URLs for GitHub, GitLab, Bitbucket, and Azure DevOps are accepted. If credentials are embedded, the daemon strips them from the configured remote URL and stores credentials separately.
 
@@ -756,9 +912,9 @@ Common errors: `PERMISSION_DENIED`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
 ---
 
-## 7. Agent Operations
+## 8. Agent Operations
 
-### 7.1 `agent:launch`
+### 8.1 `agent:launch`
 
 Launch the RoAgent terminal for the current `placeId`.
 
@@ -785,7 +941,7 @@ Response type: `agent:launch:response`
 
 Common errors: `PERMISSION_DENIED`, `AGENT_UNAVAILABLE`, `INVALID_PAYLOAD`, `INTERNAL_ERROR`.
 
-### 7.2 `agent:kill`
+### 8.2 `agent:kill`
 
 Kill the RoAgent terminal for the current `placeId`.
 
@@ -803,7 +959,7 @@ Response type: `agent:kill:response`
 
 Common errors: `AGENT_UNAVAILABLE`, `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
-### 7.3 `agent:status`
+### 8.3 `agent:status`
 
 Get RoAgent process status.
 
@@ -824,7 +980,7 @@ Response type: `agent:status:response`
 
 Common errors: `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
-### 7.4 `agent:action`
+### 8.4 `agent:action`
 
 Server push: a new agent action was just performed.
 
@@ -843,7 +999,7 @@ Push payload:
 
 The required business fields are exactly `{ timestamp, summary, tool }`; `id` is included for deduplication.
 
-### 7.5 `agent:recentActions`
+### 8.5 `agent:recentActions`
 
 Return the last 5 `agent:action` entries for the current place.
 
@@ -863,11 +1019,11 @@ Common errors: `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
 ---
 
-## 8. License Operations
+## 9. License Operations
 
 License messages may use `placeId: "__global__"` if no Roblox place is active.
 
-### 8.1 `license:activate`
+### 9.1 `license:activate`
 
 Activate a license key.
 
@@ -896,7 +1052,7 @@ License-specific failures should use `license:error`.
 
 Common license errors: `LICENSE_INVALID`, `LICENSE_EXPIRED`, `LICENSE_ALREADY_ACTIVATED`, `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
-### 8.2 `license:status`
+### 9.2 `license:status`
 
 Get current license status.
 
@@ -917,7 +1073,7 @@ Response type: `license:status:response`
 
 Common errors: `PERMISSION_DENIED`, `INTERNAL_ERROR`.
 
-### 8.3 `license:warning`
+### 9.3 `license:warning`
 
 Server push: license expiry warning.
 
@@ -929,7 +1085,7 @@ Server push: license expiry warning.
 }
 ```
 
-### 8.4 `license:revoked`
+### 9.4 `license:revoked`
 
 Server push: license was revoked.
 
@@ -941,7 +1097,7 @@ Server push: license was revoked.
 }
 ```
 
-### 8.5 `license:error`
+### 9.5 `license:error`
 
 License-specific error response. This is distinct from generic `error` so the UI can show license remediation flows.
 
@@ -962,9 +1118,9 @@ License-specific error response. This is distinct from generic `error` so the UI
 
 ---
 
-## 9. Daemon Operations
+## 10. Daemon Operations
 
-### 9.1 `daemon:health`
+### 10.1 `daemon:health`
 
 Get full daemon health status.
 
@@ -1009,7 +1165,7 @@ Common errors: `INTERNAL_ERROR`.
 
 ---
 
-## 10. Complete Message Type List
+## 11. Complete Message Type List
 
 ### Client request types
 
@@ -1020,6 +1176,10 @@ Common errors: `INTERNAL_ERROR`.
 - `script:rename`
 - `script:restore`
 - `script:list`
+- `project:list`
+- `project:scripts`
+- `project:read`
+- `project:write`
 - `history:get`
 - `history:getDeleted`
 - `watch:subscribe`
@@ -1049,6 +1209,10 @@ Common errors: `INTERNAL_ERROR`.
 - `script:rename:response`
 - `script:restore:response`
 - `script:list:response`
+- `project:list:response`
+- `project:scripts:response`
+- `project:read:response`
+- `project:write:response`
 - `history:get:response`
 - `history:getDeleted:response`
 - `watch:subscribe:response`

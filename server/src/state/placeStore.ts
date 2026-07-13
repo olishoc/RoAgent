@@ -1,17 +1,25 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Config } from "../config.ts";
 import { AppError } from "../errors.ts";
-import { ErrorCode, type ScriptClassName, type ScriptPath, type ScriptRecord, type ScriptRef, type VersionId } from "../../../shared/protocol.ts";
+import { ErrorCode, type PlaceId, type ProjectSummary, type ScriptClassName, type ScriptPath, type ScriptRecord, type ScriptRef, type VersionId } from "../../../shared/protocol.ts";
 
 interface PlaceRegistryFile {
   scripts: ScriptRecord[];
   updatedAt: string;
+  metadata?: PlaceMetadata;
+}
+
+interface PlaceMetadata {
+  placeName?: string;
+  gameId?: string;
+  jobId?: string;
 }
 
 export class PlaceStore {
   private readonly places = new Map<string, Map<ScriptPath, ScriptRecord>>();
+  private readonly metadata = new Map<PlaceId, PlaceMetadata>();
 
   constructor(private readonly config: Config) {}
 
@@ -25,6 +33,39 @@ export class PlaceStore {
 
   listActivePlaces(): string[] {
     return [...this.places.keys()];
+  }
+
+  updatePlaceMetadata(placeId: PlaceId, metadata: PlaceMetadata): void {
+    this.loadPlace(placeId);
+    const current = this.metadata.get(placeId) ?? {};
+    const next: PlaceMetadata = {
+      placeName: metadata.placeName || current.placeName,
+      gameId: metadata.gameId || current.gameId,
+      jobId: metadata.jobId || current.jobId,
+    };
+    this.metadata.set(placeId, next);
+    this.savePlace(placeId);
+  }
+
+  getProject(placeId: PlaceId): ProjectSummary {
+    const active = this.places.has(placeId);
+    this.loadPlace(placeId);
+    return this.projectSummary(placeId, active || this.places.has(placeId));
+  }
+
+  listProjects(options: { includeInactive?: boolean } = {}): ProjectSummary[] {
+    const activeIds = new Set<PlaceId>(this.listActivePlaces());
+    const ids = new Set<PlaceId>(activeIds);
+    const placesRoot = path.join(this.config.dataDirectory, "places");
+    if (existsSync(placesRoot)) {
+      for (const entry of readdirSync(placesRoot, { withFileTypes: true })) {
+        if (entry.isDirectory()) ids.add(decodeURIComponent(entry.name));
+      }
+    }
+    return [...ids]
+      .map((placeId) => this.projectSummary(placeId, activeIds.has(placeId)))
+      .filter((project) => options.includeInactive || project.scriptsCount > 0 || project.active)
+      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") || a.placeId.localeCompare(b.placeId));
   }
 
   async list(placeId: string, options: { includeSource?: boolean; includeDeleted?: boolean } = {}): Promise<ScriptRecord[]> {
@@ -304,6 +345,7 @@ export class PlaceStore {
     const place = new Map<ScriptPath, ScriptRecord>();
     if (existsSync(file)) {
       const parsed = JSON.parse(readFileSync(file, "utf8")) as PlaceRegistryFile;
+      this.metadata.set(placeId, parsed.metadata ?? {});
       for (const script of parsed.scripts || []) {
         const normalized = this.normalizeScriptRecord(script);
         const key = this.scriptKey(normalized.path, normalized.uniqueId);
@@ -311,6 +353,7 @@ export class PlaceStore {
         if (!existing || Date.parse(normalized.updatedAt) >= Date.parse(existing.updatedAt)) place.set(key, normalized);
       }
     }
+    if (!this.metadata.has(placeId)) this.metadata.set(placeId, {});
     this.places.set(placeId, place);
     return place;
   }
@@ -321,8 +364,38 @@ export class PlaceStore {
     const file = path.join(dir, "scripts.json");
     const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
     const scripts = [...this.loadPlace(placeId).values()].sort((a, b) => a.path.localeCompare(b.path));
-    writeFileSync(tmp, JSON.stringify({ scripts, updatedAt: new Date().toISOString() } satisfies PlaceRegistryFile, null, 2), "utf8");
+    writeFileSync(tmp, JSON.stringify({ scripts, updatedAt: new Date().toISOString(), metadata: this.metadata.get(placeId) ?? {} } satisfies PlaceRegistryFile, null, 2), "utf8");
     renameSync(tmp, file);
+  }
+
+  private projectSummary(placeId: PlaceId, active: boolean): ProjectSummary {
+    const place = this.loadPlace(placeId);
+    const scripts = [...place.values()].filter((script) => !script.deleted && !this.isProtectedScriptPath(script.path));
+    const placeDir = this.getPlaceDirectory(placeId);
+    const repoDir = this.getRepoDirectory(placeId);
+    const latestScriptUpdate = scripts.map((script) => script.updatedAt).sort().at(-1);
+    const registryUpdate = (() => {
+      const file = path.join(placeDir, "scripts.json");
+      try {
+        return existsSync(file) ? statSync(file).mtime.toISOString() : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+    const meta = this.metadata.get(placeId) ?? {};
+    return {
+      placeId,
+      placeName: meta.placeName,
+      gameId: meta.gameId,
+      jobId: meta.jobId,
+      placeDir,
+      repoDir,
+      hasRepo: existsSync(repoDir),
+      active,
+      scriptsCount: scripts.length,
+      totalBytes: scripts.reduce((sum, script) => sum + script.size, 0),
+      updatedAt: latestScriptUpdate ?? registryUpdate,
+    };
   }
 
   private normalizeScriptRecord(script: ScriptRecord): ScriptRecord {

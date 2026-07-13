@@ -219,6 +219,11 @@ export const scriptHandlers: Record<string, Handler> = {
 
   async "script:syncSnapshot"(message, context) {
     const p = payload(message);
+    context.placeStore.updatePlaceMetadata(message.placeId, {
+      placeName: typeof p.placeName === "string" ? p.placeName : undefined,
+      gameId: typeof p.gameId === "string" ? p.gameId : undefined,
+      jobId: typeof p.jobId === "string" ? p.jobId : undefined,
+    });
     const result = await context.placeStore.syncSnapshot(message.placeId, { scripts: scriptSnapshot(p.scripts) });
     for (const script of result.scripts) {
       if (context.historyStore.hasHistory(message.placeId, script.path)) continue;

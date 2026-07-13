@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type WebSocket from "ws";
 import { PROTOCOL_VERSION, type ClientToServerMessage } from "../shared/protocol.ts";
 import type { Config } from "../server/src/config.ts";
@@ -52,7 +53,7 @@ describe("gitHandlers integration", () => {
       dataDirectory,
       logLevel: "error",
       authToken: "test-token",
-      repoRoot: path.resolve(new URL("..", import.meta.url).pathname),
+      repoRoot: path.resolve(fileURLToPath(new URL("..", import.meta.url))),
       startedAt: new Date().toISOString(),
     };
     context = {

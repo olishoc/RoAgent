@@ -133,7 +133,7 @@ This lets anyone test routes. When ready to require purchases:
 PUBLIC_DOWNLOADS = "false"
 ```
 
-Then installer downloads require tokenized recovery links. The Roblox plugin bundle stays public.
+Then installer downloads require tokenized recovery links. The Roblox bridge plugin bundle stays public, and the legacy UI plugin is kept public as a temporary fallback.
 
 ## 7. Deploy
 
@@ -148,6 +148,7 @@ wrangler deploy
 curl -i https://rblxagent.com/api/releases/studiolink.json
 curl -i https://rblxagent.com/download
 curl -i https://rblxagent.com/downloads/StudioLinkPlugin_Bundled.lua
+curl -i https://rblxagent.com/downloads/StudioLinkPlugin_LegacyUI.lua
 curl -i https://rblxagent.com/downloads/StudioLinkSetup.exe
 curl -i -X POST https://rblxagent.com/api/recover \
   -H 'content-type: application/json' \

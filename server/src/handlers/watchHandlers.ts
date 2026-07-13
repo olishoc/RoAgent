@@ -9,6 +9,11 @@ function payload(message: ClientToServerMessage): Record<string, unknown> {
 export const watchHandlers: Record<string, Handler> = {
   "watch:subscribe"(message, context, ws) {
     const p = payload(message);
+    context.placeStore.updatePlaceMetadata(message.placeId, {
+      placeName: typeof p.placeName === "string" ? p.placeName : undefined,
+      gameId: typeof p.gameId === "string" ? p.gameId : undefined,
+      jobId: typeof p.jobId === "string" ? p.jobId : undefined,
+    });
     const subscriptionId = context.watchService.subscribe(message.placeId, ws, p.includeSource === true);
     return { subscribed: true, subscriptionId, placeId: message.placeId };
   },

@@ -4,10 +4,11 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { PROTOCOL_VERSION, type ProtocolMessage } from "../shared/protocol.ts";
 
-const repoRoot = path.resolve(new URL("..", import.meta.url).pathname);
+const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const serverRoot = path.join(repoRoot, "server");
 const roagentPath = path.join(repoRoot, "roagent", "dist", process.platform === "win32" ? "roagent.exe" : "roagent");
 const port = 21000 + Math.floor(Math.random() * 2000);
@@ -15,6 +16,8 @@ const token = "e2e-test-token";
 const dataDir = mkdtempSync(path.join(tmpdir(), "studiolink-e2e-"));
 const placeA = `place-a-${randomUUID()}`;
 const placeB = `place-b-${randomUUID()}`;
+const npmExecutable = process.platform === "win32" ? "cmd.exe" : "npm";
+const npmStartArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm", "start"] : ["start"];
 
 let child: ChildProcess;
 let wsA: WebSocket;
@@ -111,7 +114,7 @@ async function waitUntil(predicate: () => boolean, label: string): Promise<void>
 
 describe("StudioLink prompts 1-6 integrated behavior", () => {
   beforeAll(async () => {
-    child = spawn("npm", ["start"], {
+    child = spawn(npmExecutable, npmStartArgs, {
       cwd: serverRoot,
       env: {
         ...process.env,
@@ -151,7 +154,8 @@ describe("StudioLink prompts 1-6 integrated behavior", () => {
     const health = await response.json() as Record<string, unknown>;
     expect(health.version).toBe("3.0.0");
     expect(health.roAgentInstalled).toBe(true);
-    expect(health.roAgentPath).toBe(roagentPath);
+    expect(path.basename(String(health.roAgentPath))).toBe(process.platform === "win32" ? "roagent.exe" : "roagent");
+    expect(existsSync(String(health.roAgentPath))).toBe(true);
     expect(health.gitInstalled).toBe(true);
     expect(health.licenseStatus).toBe("UNLICENSED");
     expect(typeof health.uptime).toBe("number");
@@ -180,8 +184,8 @@ describe("StudioLink prompts 1-6 integrated behavior", () => {
   it("keeps script, history, and watch traffic isolated by placeId", async () => {
     const seenA = collect(wsA);
     const seenB = collect(wsB);
-    const subA = await ok(wsA, placeA, "watch:subscribe", { includeSource: true });
-    const subB = await ok(wsB, placeB, "watch:subscribe", { includeSource: true });
+    const subA = await ok(wsA, placeA, "watch:subscribe", { includeSource: true, placeName: "StudioLink Test Place", gameId: "1001", jobId: "job-a" });
+    const subB = await ok(wsB, placeB, "watch:subscribe", { includeSource: true, placeName: "Other Test Place", gameId: "1002", jobId: "job-b" });
     const subAId = (subA.payload as { subscriptionId: string }).subscriptionId;
     const subBId = (subB.payload as { subscriptionId: string }).subscriptionId;
 
@@ -200,6 +204,31 @@ describe("StudioLink prompts 1-6 integrated behavior", () => {
 
     const list = await ok(wsA, placeA, "script:list", { includeSource: true });
     expect(JSON.stringify(list.payload)).toContain("ServerScriptService.GameManager");
+
+    const projects = await ok(wsA, "__global__", "project:list", {});
+    const projectA = (projects.payload as { projects: Array<Record<string, unknown>> }).projects.find((project) => project.placeId === placeA);
+    expect(projectA).toBeTruthy();
+    expect(projectA?.placeName).toBe("StudioLink Test Place");
+    expect(projectA?.scriptsCount).toBeGreaterThanOrEqual(1);
+    expect(projectA?.placeDir).toContain(encodeURIComponent(placeA));
+
+    const projectScripts = await ok(wsA, "__global__", "project:scripts", { placeId: placeA, includeSource: true });
+    expect(JSON.stringify(projectScripts.payload)).toContain("ServerScriptService.GameManager");
+    expect((projectScripts.payload as { project: { placeId: string } }).project.placeId).toBe(placeA);
+
+    const projectRead = await ok(wsA, "__global__", "project:read", { placeId: placeA, path: "ServerScriptService.GameManager" });
+    expect(JSON.stringify(projectRead.payload)).toContain("print('updated')");
+
+    const projectWrite = await ok(wsA, "__global__", "project:write", {
+      placeId: placeA,
+      path: "ServerScriptService.GameManager",
+      source: "print('project api')",
+      pendingStudioDeploy: true,
+      summary: "Update through project API",
+    });
+    expect(JSON.stringify(projectWrite.payload)).toContain("project api");
+    expect(JSON.stringify(projectWrite.payload)).toContain('"pendingStudioDeploy":true');
+    expect(JSON.stringify(projectWrite.payload)).toContain("historyVersion");
 
     await ok(wsA, placeA, "script:rename", { fromPath: "ServerScriptService.GameManager", toPath: "ServerScriptService.GameController" });
     await ok(wsA, placeA, "script:delete", { path: "ServerScriptService.GameController" });

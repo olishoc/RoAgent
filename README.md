@@ -33,7 +33,8 @@ The daemon listens on `http://127.0.0.1:45678` by default.
 1. Open Roblox Studio.
 2. Make sure **HttpService is enabled** for the place.
 3. Use the Creator Store/plugin workflow for production, or use the generated local bundle during development:
-   - `plugin/StudioLinkPlugin_Bundled.lua`
+   - `plugin/StudioLinkBridgeOnly_Bundled.lua` for the default bridge-only plugin
+   - `plugin/StudioLinkPlugin_Bundled.lua` for the legacy in-Studio UI fallback
    - `plugin/PluginLua.lua` for manual upload/copy workflows
 4. Reload Roblox Studio/plugin after updating the plugin source.
 

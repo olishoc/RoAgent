@@ -4,6 +4,7 @@ import type { Handler, HandlerContext } from "../types.ts";
 import { ErrorCode, type ClientToServerMessage } from "../../../shared/protocol.ts";
 import { sendEnvelope, sendError } from "./respond.ts";
 import { scriptHandlers } from "../handlers/scriptHandlers.ts";
+import { projectHandlers } from "../handlers/projectHandlers.ts";
 import { historyHandlers } from "../handlers/historyHandlers.ts";
 import { watchHandlers } from "../handlers/watchHandlers.ts";
 import { gitHandlers } from "../handlers/gitHandlers.ts";
@@ -13,6 +14,7 @@ import { daemonHandlers } from "../handlers/daemonHandlers.ts";
 
 const handlers: Record<string, Handler> = {
   ...scriptHandlers,
+  ...projectHandlers,
   ...historyHandlers,
   ...watchHandlers,
   ...gitHandlers,

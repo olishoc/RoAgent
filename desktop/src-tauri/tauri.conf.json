@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "StudioLink Mission Control",
+  "version": "0.1.0",
+  "identifier": "com.rblxagent.missioncontrol",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1437",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "StudioLink Mission Control",
+        "width": 1220,
+        "height": 760,
+        "minWidth": 980,
+        "minHeight": 660,
+        "resizable": true,
+        "transparent": true,
+        "decorations": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "category": "DeveloperTool",
+    "shortDescription": "Mission control for StudioLink and the local daemon.",
+    "longDescription": "A desktop command center for managing the StudioLink daemon, Roblox Studio bridge, update state, and future coding sessions.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["English"]
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
+  }
+}

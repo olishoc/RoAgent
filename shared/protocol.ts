@@ -69,6 +69,20 @@ export interface ScriptRecord extends ScriptSummary {
   source: string;
 }
 
+export interface ProjectSummary {
+  placeId: PlaceId;
+  placeName?: string;
+  gameId?: string;
+  jobId?: string;
+  placeDir: string;
+  repoDir: string;
+  hasRepo: boolean;
+  active: boolean;
+  scriptsCount: number;
+  totalBytes: number;
+  updatedAt?: IsoTimestamp;
+}
+
 export interface HistoryVersion {
   versionNumber?: number;
   versionId: VersionId;
@@ -356,6 +370,63 @@ export interface ScriptListResponsePayload {
   totalBytes: number;
 }
 export type ScriptListResponse = Envelope<"script:list:response", ScriptListResponsePayload>;
+
+// Project messages
+
+export interface ProjectListRequestPayload {
+  includeInactive?: boolean;
+}
+export type ProjectListRequest = Envelope<"project:list", ProjectListRequestPayload>;
+export interface ProjectListResponsePayload {
+  projects: ProjectSummary[];
+  count: number;
+}
+export type ProjectListResponse = Envelope<"project:list:response", ProjectListResponsePayload>;
+
+export interface ProjectScriptsRequestPayload {
+  placeId?: PlaceId;
+  includeSource?: boolean;
+  includeDeleted?: boolean;
+}
+export type ProjectScriptsRequest = Envelope<"project:scripts", ProjectScriptsRequestPayload>;
+export interface ProjectScriptsResponsePayload {
+  project: ProjectSummary;
+  scripts: ScriptSummary[];
+  count: number;
+  totalBytes: number;
+}
+export type ProjectScriptsResponse = Envelope<"project:scripts:response", ProjectScriptsResponsePayload>;
+
+export interface ProjectReadRequestPayload {
+  placeId?: PlaceId;
+  path: ScriptPath;
+  uniqueId?: string;
+}
+export type ProjectReadRequest = Envelope<"project:read", ProjectReadRequestPayload>;
+export interface ProjectReadResponsePayload {
+  project: ProjectSummary;
+  script: ScriptRecord;
+}
+export type ProjectReadResponse = Envelope<"project:read:response", ProjectReadResponsePayload>;
+
+export interface ProjectWriteRequestPayload {
+  placeId?: PlaceId;
+  path: ScriptPath;
+  uniqueId?: string;
+  source: string;
+  className?: ScriptClassName;
+  expectedVersionId?: VersionId;
+  pendingStudioDeploy?: boolean;
+  summary?: string;
+  origin?: string;
+}
+export type ProjectWriteRequest = Envelope<"project:write", ProjectWriteRequestPayload>;
+export interface ProjectWriteResponsePayload {
+  project: ProjectSummary;
+  script: ScriptRecord;
+  historyVersion: HistoryVersion;
+}
+export type ProjectWriteResponse = Envelope<"project:write:response", ProjectWriteResponsePayload>;
 
 // History messages
 
@@ -646,6 +717,9 @@ export type ScriptResponseMessage =
 export type HistoryRequestMessage = HistoryGetRequest | HistoryGetDeletedRequest;
 export type HistoryResponseMessage = HistoryGetResponse | HistoryGetDeletedResponse;
 
+export type ProjectRequestMessage = ProjectListRequest | ProjectScriptsRequest | ProjectReadRequest | ProjectWriteRequest;
+export type ProjectResponseMessage = ProjectListResponse | ProjectScriptsResponse | ProjectReadResponse | ProjectWriteResponse;
+
 export type WatchRequestMessage = WatchSubscribeRequest | WatchUnsubscribeRequest;
 export type WatchResponseMessage = WatchSubscribeResponse | WatchUnsubscribeResponse;
 
@@ -699,6 +773,7 @@ export type DaemonResponseMessage = DaemonHealthResponse;
 
 export type ClientToServerMessage =
   | ScriptRequestMessage
+  | ProjectRequestMessage
   | HistoryRequestMessage
   | WatchRequestMessage
   | GitRequestMessage
@@ -710,6 +785,7 @@ export type RequestMessage = ClientToServerMessage;
 
 export type SuccessResponseMessage =
   | ScriptResponseMessage
+  | ProjectResponseMessage
   | HistoryResponseMessage
   | WatchResponseMessage
   | GitResponseMessage
