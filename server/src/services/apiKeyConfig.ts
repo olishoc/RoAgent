@@ -44,6 +44,23 @@ export async function getApiKey(): Promise<string | null> {
   return keytar.getPassword(SERVICE, ACCOUNT);
 }
 
+export function buildAiLaunchEnvironment(config: Partial<StudioLinkAiConfig>, apiKey: string | null): Record<string, string> {
+  const provider = config.aiProvider;
+  if (!provider || !isProvider(provider) || !config.aiModel || !apiKey) return {};
+  return {
+    STUDIOLINK_AI_PROVIDER: provider,
+    STUDIOLINK_AI_MODEL: config.aiModel,
+    STUDIOLINK_AI_API_KEY: apiKey,
+  };
+}
+
+export async function getAiLaunchEnvironment(): Promise<Record<string, string>> {
+  const file = configPath();
+  if (!existsSync(file)) return {};
+  const config = readExistingConfig(file);
+  return buildAiLaunchEnvironment(config, await getApiKey());
+}
+
 async function loadKeytar(): Promise<typeof import("keytar")> {
   return import("keytar");
 }

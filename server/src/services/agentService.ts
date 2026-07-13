@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { AppError } from "../errors.ts";
 import { ErrorCode, type AgentAction, type AgentStatus, type PlaceId, type ScriptRecord } from "../../../shared/protocol.ts";
 import type { HandlerContext } from "../types.ts";
+import { getAiLaunchEnvironment } from "./apiKeyConfig.ts";
 
 type ProcessKind = "posix" | "windows";
 
@@ -56,10 +57,13 @@ export class AgentService {
     const repoPath = context.placeStore.getPlaceDirectory(placeId);
     const scriptsDir = await this.materializeScripts(placeId, repoPath, context);
     const executable = this.resolveExecutable(context.config.repoRoot);
+    const project = context.placeStore.getProject(placeId);
     const args = [
       "--studiolink",
       "--studiolink-place-id",
       placeId,
+      "--studiolink-place-name",
+      project.placeName ?? "Roblox Place",
       "--studiolink-daemon-port",
       String(context.config.port),
       "--studiolink-auth-token",
@@ -67,9 +71,14 @@ export class AgentService {
       "--studiolink-scripts-dir",
       scriptsDir,
     ];
+    const aiEnvironment = await getAiLaunchEnvironment().catch((error) => {
+      context.logger.warn(context.logger.sanitizeError(error), "Unable to load StudioLink AI credentials; RoAgent will use its own login state");
+      return {};
+    });
+    const environment = { ...process.env, ...aiEnvironment };
 
     try {
-      const launched = this.spawnTerminal(executable, args, repoPath);
+      const launched = this.spawnTerminal(executable, args, repoPath, environment);
       const now = new Date().toISOString();
       const state: AgentProcessState = {
         child: launched.child,
@@ -173,38 +182,38 @@ export class AgentService {
     return found;
   }
 
-  private spawnTerminal(executable: string, args: string[], cwd: string): TerminalLaunchResult {
-    if (process.platform === "win32") return this.spawnNativeWindowsTerminal(executable, args, cwd);
-    if (this.isWsl()) return this.spawnWslWindowsTerminal(executable, args, cwd);
-    return this.spawnLinuxTerminal(executable, args, cwd);
+  private spawnTerminal(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): TerminalLaunchResult {
+    if (process.platform === "win32") return this.spawnNativeWindowsTerminal(executable, args, cwd, env);
+    if (this.isWsl()) return this.spawnWslWindowsTerminal(executable, args, cwd, env);
+    return this.spawnLinuxTerminal(executable, args, cwd, env);
   }
 
-  private spawnNativeWindowsTerminal(executable: string, args: string[], cwd: string): TerminalLaunchResult {
+  private spawnNativeWindowsTerminal(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): TerminalLaunchResult {
     const commandLine = ["call", this.quoteCmdArg(executable), ...args.map((arg) => this.quoteCmdArg(arg))].join(" ");
-    const pid = this.spawnWindowsCmd(commandLine, cwd);
+    const pid = this.spawnWindowsCmd(commandLine, cwd, env);
     return { pid, persistentTerminal: false, processKind: "windows" };
   }
 
-  private spawnWslWindowsTerminal(executable: string, args: string[], cwd: string): TerminalLaunchResult {
+  private spawnWslWindowsTerminal(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): TerminalLaunchResult {
     const shellCommand = this.buildRoAgentShellCommand(executable, args, cwd);
     const commandLine = ["call", "wsl.exe", "--cd", this.quoteCmdArg(cwd), "--", "bash", "-lc", this.quoteCmdArg(shellCommand)].join(" ");
-    const pid = this.spawnWindowsCmd(commandLine);
+    const pid = this.spawnWindowsCmd(commandLine, undefined, env);
     return { pid, persistentTerminal: false, processKind: "windows" };
   }
 
-  private spawnLinuxTerminal(executable: string, args: string[], cwd: string): TerminalLaunchResult {
+  private spawnLinuxTerminal(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): TerminalLaunchResult {
     const scriptCommand = this.buildRoAgentShellCommand(executable, args, cwd);
     const terminal = this.findLinuxTerminal();
     if (terminal) {
-      const child = this.spawnLinuxTerminalCommand(terminal, scriptCommand, cwd);
+      const child = this.spawnLinuxTerminalCommand(terminal, scriptCommand, cwd, env);
       return { child, pid: child.pid, persistentTerminal: false, processKind: "posix" };
     }
     const scriptBin = ["/usr/bin/script", "/bin/script"].find((candidate) => existsSync(candidate));
     if (scriptBin) {
-      const child = spawn(scriptBin, ["-q", "-c", scriptCommand, "/dev/null"], { cwd, detached: true, stdio: "ignore" });
+      const child = spawn(scriptBin, ["-q", "-c", scriptCommand, "/dev/null"], { cwd, detached: true, stdio: "ignore", env });
       return { child, pid: child.pid, persistentTerminal: false, processKind: "posix" };
     }
-    const child = spawn(executable, args, { cwd, detached: true, stdio: "ignore" });
+    const child = spawn(executable, args, { cwd, detached: true, stdio: "ignore", env });
     return { child, pid: child.pid, persistentTerminal: false, processKind: "posix" };
   }
 
@@ -223,13 +232,13 @@ export class AgentService {
     ].join("; ");
   }
 
-  private spawnWindowsCmd(commandLine: string, workingDirectory?: string): number {
+  private spawnWindowsCmd(commandLine: string, workingDirectory?: string, env: NodeJS.ProcessEnv = process.env): number {
     const workingDirectoryArg = workingDirectory ? ` -WorkingDirectory ${this.quotePowerShellString(workingDirectory)}` : "";
     const script = [
       `$p = Start-Process -FilePath $env:ComSpec -ArgumentList @('/d','/k',${this.quotePowerShellString(commandLine)})${workingDirectoryArg} -WindowStyle Normal -PassThru`,
       "Write-Output $p.Id",
     ].join("; ");
-    const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], { encoding: "utf8", windowsHide: true });
+    const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], { encoding: "utf8", windowsHide: true, env });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(result.stderr?.trim() || "PowerShell Start-Process failed");
     const pid = Number.parseInt(result.stdout.trim(), 10);
@@ -244,10 +253,10 @@ export class AgentService {
     });
   }
 
-  private spawnLinuxTerminalCommand(terminal: string, command: string, cwd: string): ChildProcess {
-    if (terminal === "gnome-terminal") return spawn(terminal, ["--", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore" });
-    if (terminal === "konsole") return spawn(terminal, ["-e", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore" });
-    return spawn(terminal, ["-e", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore" });
+  private spawnLinuxTerminalCommand(terminal: string, command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
+    if (terminal === "gnome-terminal") return spawn(terminal, ["--", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore", env });
+    if (terminal === "konsole") return spawn(terminal, ["-e", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore", env });
+    return spawn(terminal, ["-e", "bash", "-lc", command], { cwd, detached: true, stdio: "ignore", env });
   }
 
   private isWsl(): boolean {

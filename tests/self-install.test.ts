@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { addPathEntry, commandShimContents, defaultInstallDir, isInstalledPath, isPackagedWindowsDaemon, pathListContains, removePathEntry, shouldRunSelfInstall } from "../server/src/services/selfInstallService.ts";
+import { addPathEntry, commandShimContents, copyRoAgentRuntimeAssets, defaultInstallDir, isInstalledPath, isPackagedWindowsDaemon, pathListContains, removePathEntry, shouldRunSelfInstall } from "../server/src/services/selfInstallService.ts";
 
 describe("self-install helpers", () => {
   it("uses per-user LocalAppData install directory", () => {
@@ -69,5 +71,26 @@ describe("self-install helpers", () => {
   it("removes the install directory from PATH", () => {
     const dir = "C:\\Users\\Ada\\AppData\\Local\\Programs\\StudioLink";
     expect(removePathEntry(`C:\\Windows\\System32;${dir};C:\\Tools`, dir)).toBe("C:\\Windows\\System32;C:\\Tools");
+  });
+
+  it("copies the RoAgent runtime assets required by the installed executable", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "studiolink-roagent-assets-"));
+    const source = path.join(root, "source");
+    const destination = path.join(root, "destination");
+    try {
+      mkdirSync(path.join(source, "theme"), { recursive: true });
+      mkdirSync(path.join(source, "assets"), { recursive: true });
+      writeFileSync(path.join(source, "package.json"), '{"name":"roagent"}', "utf8");
+      writeFileSync(path.join(source, "theme", "dark.json"), '{"name":"dark"}', "utf8");
+      writeFileSync(path.join(source, "assets", "logo.png"), Buffer.from([1, 2, 3]));
+
+      copyRoAgentRuntimeAssets(source, destination);
+
+      expect(readFileSync(path.join(destination, "package.json"), "utf8")).toContain("roagent");
+      expect(readFileSync(path.join(destination, "theme", "dark.json"), "utf8")).toContain("dark");
+      expect(existsSync(path.join(destination, "assets", "logo.png"))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

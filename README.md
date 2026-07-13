@@ -18,6 +18,14 @@ RoAgent connects Roblox Studio to a local Windows daemon and a terminal-based AI
 
 ## Quick Start for Local Development
 
+### 0. Build the local RoAgent executable
+
+```bash
+npm run build:roagent
+```
+
+This command checks out the pinned [StudioLink RoAgent runtime](https://github.com/olishoc/roagent-runtime) into the ignored `roagent/` dependency folder, installs its locked dependencies, and builds `roagent/dist/roagent.exe` plus its required runtime assets on Windows. Run it before the integrated e2e suite on a fresh checkout.
+
 ### 1. Start the daemon
 
 ```bash

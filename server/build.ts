@@ -1,4 +1,4 @@
-import { mkdirSync, copyFileSync, existsSync, chmodSync, rmSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { mkdirSync, copyFileSync, cpSync, existsSync, chmodSync, rmSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ const buildSrc = path.join(distDir, "build-src");
 const platform = process.env.STUDIOLINK_TARGET_PLATFORM ?? process.platform;
 const target = platform === "win32" ? "node20-win-x64" : platform === "darwin" ? "node20-macos-x64" : "node20-linux-x64";
 const exeName = platform === "win32" ? "studiolink-daemon.exe" : "studiolink-daemon";
+const roAgentRuntimeAssetNames = ["package.json", "README.md", "CHANGELOG.md", "theme", "assets", "export-html", "docs", "examples", "photon_rs_bg.wasm"];
 
 function run(command: string, args: string[], cwd = serverRoot): void {
   const result = spawnSync(command, args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
@@ -61,20 +62,26 @@ if (platform === "win32") {
   const roAgentSource = process.env.STUDIOLINK_EMBED_ROAGENT_PATH || path.join(repoRoot, "dist", "roagent.exe");
   if (existsSync(roAgentSource)) {
     const embeddedDir = path.join(nccOut, "embedded");
+    const embeddedAssetsDir = path.join(embeddedDir, "roagent-assets");
+    const roAgentAssetsSource = process.env.STUDIOLINK_EMBED_ROAGENT_ASSETS_PATH || path.dirname(roAgentSource);
     mkdirSync(embeddedDir, { recursive: true });
     copyFileSync(roAgentSource, path.join(embeddedDir, "roagent.exe"));
-    const roAgentPackageSource = process.env.STUDIOLINK_EMBED_ROAGENT_PACKAGE_PATH || path.join(repoRoot, "roagent", "packages", "coding-agent", "package.json");
-    if (existsSync(roAgentPackageSource)) {
-      copyFileSync(roAgentPackageSource, path.join(embeddedDir, "package.json"));
-      console.log(`Embedded RoAgent package metadata from ${roAgentPackageSource}`);
-    } else {
-      console.warn(`RoAgent package metadata not found at ${roAgentPackageSource}; embedded RoAgent may not launch.`);
+    mkdirSync(embeddedAssetsDir, { recursive: true });
+    for (const assetName of roAgentRuntimeAssetNames) {
+      const source = assetName === "package.json" && process.env.STUDIOLINK_EMBED_ROAGENT_PACKAGE_PATH
+        ? process.env.STUDIOLINK_EMBED_ROAGENT_PACKAGE_PATH
+        : path.join(roAgentAssetsSource, assetName);
+      if (!existsSync(source)) {
+        throw new Error(`Required RoAgent runtime asset not found: ${source}`);
+      }
+      cpSync(source, path.join(embeddedAssetsDir, assetName), { recursive: true });
     }
+    copyFileSync(path.join(embeddedAssetsDir, "package.json"), path.join(embeddedDir, "package.json"));
     pkgJson.pkg = {
       ...((typeof pkgJson.pkg === "object" && pkgJson.pkg !== null) ? pkgJson.pkg as Record<string, unknown> : {}),
       assets: ["embedded/**/*"],
     };
-    console.log(`Embedded RoAgent from ${roAgentSource}`);
+    console.log(`Embedded RoAgent and runtime assets from ${roAgentSource}`);
   } else {
     console.warn(`RoAgent executable not found at ${roAgentSource}; Windows daemon will self-install without embedded RoAgent.`);
   }

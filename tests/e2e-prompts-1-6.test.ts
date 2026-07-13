@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -114,6 +114,26 @@ async function waitUntil(predicate: () => boolean, label: string): Promise<void>
 
 describe("StudioLink prompts 1-6 integrated behavior", () => {
   beforeAll(async () => {
+    if (!existsSync(roagentPath)) {
+      throw new Error(`RoAgent executable is missing at ${roagentPath}. Run npm run build:roagent from ${repoRoot}.`);
+    }
+    const darkThemePath = path.join(path.dirname(roagentPath), "theme", "dark.json");
+    if (!existsSync(darkThemePath)) {
+      throw new Error(`RoAgent runtime assets are missing at ${darkThemePath}. Run npm run build:roagent from ${repoRoot}.`);
+    }
+    const contract = spawnSync(roagentPath, [
+      "--studiolink",
+      "--studiolink-place-id", placeA,
+      "--studiolink-place-name", "StudioLink E2E",
+      "--studiolink-daemon-port", String(port),
+      "--studiolink-auth-token", token,
+      "--studiolink-scripts-dir", dataDir,
+      "--help",
+    ], { cwd: path.dirname(roagentPath), encoding: "utf8", timeout: 20_000 });
+    const contractOutput = `${contract.stdout ?? ""}\n${contract.stderr ?? ""}`;
+    if (contract.status !== 0 || !contractOutput.includes("--studiolink")) {
+      throw new Error(`RoAgent executable does not implement the StudioLink launch contract. Output:\n${contractOutput}`);
+    }
     child = spawn(npmExecutable, npmStartArgs, {
       cwd: serverRoot,
       env: {

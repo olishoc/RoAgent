@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
@@ -21,6 +21,7 @@ const RUN_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const RUN_VALUE = "StudioLink";
 const UNINSTALL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\StudioLink";
 const CLI_COMMANDS = new Set(["install", "uninstall", "repair", "start", "stop", "restart", "status", "settings", "version", "doctor", "autostart", "logs", "help", "--help", "-h"]);
+export const RO_AGENT_RUNTIME_ASSET_NAMES = ["package.json", "README.md", "CHANGELOG.md", "theme", "assets", "export-html", "docs", "examples", "photon_rs_bg.wasm"] as const;
 
 export function defaultInstallDir(env: SelfInstallEnv = process.env, home = homedir()): string {
   const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
@@ -62,6 +63,10 @@ export function embeddedRoAgentAssetPath(): string {
 
 function embeddedRoAgentPackagePath(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "embedded", "package.json");
+}
+
+export function embeddedRoAgentAssetsPath(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "embedded", "roagent-assets");
 }
 
 export function hasEmbeddedRoAgent(): boolean {
@@ -190,7 +195,7 @@ function copyFileWithRetry(src: string, dest: string): void {
 
 function stopInstalledDaemonForReplace(daemonPath: string): void {
   try {
-    execFileSync("powershell.exe", [
+    const args = [
       "-NoProfile",
       "-ExecutionPolicy",
       "Bypass",
@@ -198,7 +203,8 @@ function stopInstalledDaemonForReplace(daemonPath: string): void {
       "$target = $args[0]; $current = [int]$args[1]; Get-Process studiolink-daemon -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $current -and ($_.Path -eq $target -or $_.Path -eq $null) } | Stop-Process -Force",
       daemonPath,
       String(process.pid),
-    ], { stdio: "ignore", windowsHide: true });
+    ];
+    execFileSync("powershell.exe", args, { stdio: "ignore", windowsHide: true });
   } catch {
     // If process inspection fails, the retry loop still handles a transient lock.
   }
@@ -212,16 +218,39 @@ function installRoAgent(installDir: string): boolean {
   const embedded = embeddedRoAgentAssetPath();
   if (existsSync(embedded)) {
     writeFileSync(roAgentDest, readFileSync(embedded));
+    copyRoAgentRuntimeAssets(embeddedRoAgentAssetsPath(), roAgentDir);
     installRoAgentPackageJson(roAgentDir);
     return true;
   }
   const adjacent = findAdjacentRoAgent();
   if (adjacent) {
-    copyFileSync(adjacent, roAgentDest);
+    if (canonicalPath(adjacent) !== canonicalPath(roAgentDest)) copyFileSync(adjacent, roAgentDest);
+    copyRoAgentRuntimeAssets(dirname(adjacent), roAgentDir);
     installRoAgentPackageJson(roAgentDir);
     return true;
   }
   return false;
+}
+
+export function copyRoAgentRuntimeAssets(sourceDir: string, destinationDir: string): void {
+  if (canonicalPath(sourceDir) === canonicalPath(destinationDir)) return;
+  for (const assetName of RO_AGENT_RUNTIME_ASSET_NAMES) {
+    const source = join(sourceDir, assetName);
+    if (!existsSync(source)) continue;
+    const destination = join(destinationDir, assetName);
+    rmSync(destination, { recursive: true, force: true });
+    copyAssetTree(source, destination);
+  }
+}
+
+function copyAssetTree(source: string, destination: string): void {
+  if (statSync(source).isDirectory()) {
+    mkdirSync(destination, { recursive: true });
+    for (const entry of readdirSync(source)) copyAssetTree(join(source, entry), join(destination, entry));
+    return;
+  }
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, readFileSync(source));
 }
 
 function installRoAgentPackageJson(roAgentDir: string): void {

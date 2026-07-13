@@ -1,4 +1,4 @@
-# RblxAgent website worker
+# RoAgent website worker
 
 This Cloudflare Worker serves `rblxagent.com` pages, release manifests, test downloads, Polar webhook entitlement wiring, and recovery links.
 
@@ -79,7 +79,7 @@ WINDOWS_DAEMON_SIZE = "12345678"
 # WINDOWS_DAEMON_URL = "https://github.com/.../studiolink-daemon.exe"
 MACOS_INSTALLER_SHA256 = "<64 hex chars>"
 MACOS_INSTALLER_SIZE = "12345678"
-RESEND_FROM = "RblxAgent <support@rblxagent.com>"
+RESEND_FROM = "RoAgent <support@rblxagent.com>"
 ```
 
 Secrets:

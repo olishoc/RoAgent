@@ -27,6 +27,14 @@ function req(path: string, init?: RequestInit) {
 }
 
 describe("website worker", () => {
+  it("uses RoAgent branding without legacy Pi Agent copy", async () => {
+    const response = await handleWebsiteRequest(req("/"), baseEnv);
+    const text = await response.text();
+    expect(text).toContain("RoAgent");
+    expect(text).not.toContain("Pi Agent");
+    expect(text).not.toContain("RblxAgent");
+  });
+
   it("serves daemon release manifest as JSON", async () => {
     const response = await handleWebsiteRequest(req("/api/releases/studiolink.json"), baseEnv);
     expect(response.status).toBe(200);

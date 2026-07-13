@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:plugin": "node tools/build-plugin-bundles.mjs"
+    "build:plugin": "node tools/build-plugin-bundles.mjs",
+    "build:roagent": "node tools/bootstrap-roagent.mjs"
   }
 }

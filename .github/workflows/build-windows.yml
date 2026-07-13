@@ -11,6 +11,8 @@ on:
     branches: [main]
     paths:
       - "server/**"
+      - "package.json"
+      - "tools/bootstrap-roagent.mjs"
       - "tools/build-roagent.mjs"
       - ".github/workflows/build-windows.yml"
 
@@ -20,31 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check out RoAgent builder
-        uses: actions/checkout@v4
-        with:
-          repository: earendil-works/pi-mono
-          ref: 87881ca686a49004df7671125626bf9314e60469
-          path: roagent
-
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: |
-            server/package-lock.json
-            roagent/package-lock.json
+          cache-dependency-path: server/package-lock.json
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
 
       - name: Build RoAgent executable
         shell: pwsh
         run: |
-          cd roagent
-          npm ci
           $env:STUDIOLINK_TARGET_PLATFORM="win32"
-          node ..\tools\build-roagent.mjs
+          npm run build:roagent
 
       - name: Build self-installing daemon executable
         shell: pwsh
@@ -53,6 +46,7 @@ jobs:
           npm ci
           $env:STUDIOLINK_TARGET_PLATFORM="win32"
           $env:STUDIOLINK_EMBED_ROAGENT_PATH="..\dist\roagent.exe"
+          $env:STUDIOLINK_EMBED_ROAGENT_ASSETS_PATH="..\dist"
           $releaseTag = "${{ github.event.inputs.release_tag || 'dev' }}"
           if ($releaseTag -eq "dev") {
             $tagAtHead = git tag --points-at HEAD | Where-Object { $_ -match '^v\d+\.\d+\.\d+' } | Select-Object -First 1
@@ -67,10 +61,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $env:STUDIOLINK_AUTO_UPDATE = "false"
           & ".\dist\studiolink-daemon.exe" install --no-autostart
           $roagent = Join-Path $env:LOCALAPPDATA "Programs\StudioLink\roagent\roagent.exe"
           if (!(Test-Path $roagent)) {
             throw "roagent.exe was not extracted to $roagent"
+          }
+          $darkTheme = Join-Path (Split-Path $roagent) "theme\dark.json"
+          if (!(Test-Path $darkTheme)) {
+            throw "RoAgent runtime assets were not extracted to $(Split-Path $roagent)"
+          }
+          $roagentVersion = & $roagent --version
+          if ($LASTEXITCODE -ne 0 -or !$roagentVersion) {
+            throw "Installed roagent.exe failed its version smoke test"
+          }
+          $contract = & $roagent --studiolink --studiolink-place-id ci-place --studiolink-place-name "CI Place" --studiolink-daemon-port 45678 --studiolink-auth-token ci-token --studiolink-scripts-dir $env:TEMP --help 2>&1
+          if ($LASTEXITCODE -ne 0 -or (($contract -join "`n") -notmatch "--studiolink")) {
+            throw "Installed roagent.exe does not implement the StudioLink launch contract"
           }
           & "$env:LOCALAPPDATA\Programs\StudioLink\studiolink-daemon.exe" status
           & "$env:LOCALAPPDATA\Programs\StudioLink\studiolink-daemon.exe" uninstall
